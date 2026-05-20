@@ -191,11 +191,22 @@
         },
         'content/plus-checkout': {
           sourceId: 'plus-checkout',
-          commands: ['plus-checkout-create', 'plus-checkout-billing', 'plus-checkout-return'],
+          commands: [
+            'plus-checkout-create',
+            'paypal-hosted-openai-checkout',
+            'plus-checkout-billing',
+            'plus-checkout-return',
+          ],
         },
         'content/paypal-flow': {
           sourceId: 'paypal-flow',
-          commands: ['paypal-approve'],
+          commands: [
+            'paypal-approve',
+            'paypal-hosted-email',
+            'paypal-hosted-card',
+            'paypal-hosted-create-account',
+            'paypal-hosted-review',
+          ],
         },
         'content/gopay-flow': {
           sourceId: 'gopay-flow',

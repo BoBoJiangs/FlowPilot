@@ -87,6 +87,30 @@ test('settings schema normalizes view input into canonical nested namespaces', (
   });
 });
 
+test('settings schema lets explicit flat step range override stale canonical range', () => {
+  const { settingsSchema } = loadApis();
+  const schema = settingsSchema.createSettingsSchema();
+  const oldState = schema.normalizeSettingsState({
+    activeFlowId: 'openai',
+    stepExecutionRangeByFlow: {
+      openai: { enabled: true, fromStep: 3, toStep: 6 },
+    },
+  });
+
+  const normalized = schema.normalizeSettingsState({
+    settingsState: oldState,
+    stepExecutionRangeByFlow: {
+      openai: { enabled: false, fromStep: 3, toStep: 6 },
+    },
+  });
+
+  assert.deepEqual(normalized.flows.openai.autoRun.stepExecutionRange, {
+    enabled: false,
+    fromStep: 3,
+    toStep: 6,
+  });
+});
+
 test('settings schema can project canonical state into a read view without legacy rebuild helpers', () => {
   const { settingsSchema } = loadApis();
   const schema = settingsSchema.createSettingsSchema();
