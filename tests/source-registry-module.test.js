@@ -127,12 +127,27 @@ test('shared source registry exposes canonical Kiro sources and drivers', () => 
   );
   assert.equal(
     registry.detectSourceFromLocation({
+      url: 'https://mail.yahoo.com/d/folders/1',
+      hostname: 'mail.yahoo.com',
+    }),
+    'yahoo-mail'
+  );
+  assert.equal(
+    registry.detectSourceFromLocation({
       url: 'https://example.com/',
       hostname: 'example.com',
     }),
     'unknown-source'
   );
 
+  assert.equal(
+    registry.matchesSourceUrlFamily(
+      'yahoo-mail',
+      'https://mail.yahoo.com/d/folders/1',
+      'https://mail.yahoo.com/d/folders/1'
+    ),
+    true
+  );
   assert.equal(
     registry.matchesSourceUrlFamily(
       'kiro-register-page',
@@ -183,6 +198,7 @@ test('shared source registry exposes canonical Kiro sources and drivers', () => 
   );
 
   assert.equal(registry.shouldReportReadyForFrame('mail-163', true), false);
+  assert.equal(registry.shouldReportReadyForFrame('yahoo-mail', true), false);
   assert.equal(registry.shouldReportReadyForFrame('kiro-register-page', true), false);
   assert.equal(registry.shouldReportReadyForFrame('kiro-desktop-authorize', true), false);
   assert.equal(registry.getCleanupOwnerSource('oauth-localhost-callback'), 'openai-auth');

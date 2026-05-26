@@ -419,6 +419,7 @@ const {
   toNormalizedEmailSet,
 } = self.IcloudUtils;
 const {
+  YAHOO_PROVIDER,
   getIcloudForwardMailConfig: getSharedIcloudForwardMailConfig,
   normalizeIcloudForwardMailProvider,
   normalizeIcloudTargetMailboxType,
@@ -2729,6 +2730,7 @@ function normalizeMailProvider(value = '') {
     case ICLOUD_PROVIDER:
     case GMAIL_PROVIDER:
     case HOTMAIL_PROVIDER:
+    case YAHOO_PROVIDER:
     case LUCKMAIL_PROVIDER:
     case CLOUDFLARE_TEMP_EMAIL_PROVIDER:
     case CLOUD_MAIL_PROVIDER:
@@ -14374,6 +14376,16 @@ function getMailConfig(state) {
       label: 'Gmail 邮箱',
       inject: ['content/activation-utils.js', 'content/utils.js', 'content/gmail-mail.js'],
       injectSource: 'gmail-mail',
+    };
+  }
+  if (provider === YAHOO_PROVIDER) {
+    return {
+      source: 'yahoo-mail',
+      url: 'https://mail.yahoo.com/d/folders/1',
+      label: 'Yahoo 邮箱',
+      navigateOnReuse: true,
+      inject: ['content/activation-utils.js', 'content/utils.js', 'content/yahoo-mail.js'],
+      injectSource: 'yahoo-mail',
     };
   }
   if (provider === LUCKMAIL_PROVIDER) {

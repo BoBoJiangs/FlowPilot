@@ -53,7 +53,7 @@ function extractFunction(name) {
     }
   }
 
-  return source.slice(start, end);
+return source.slice(start, end);
 }
 
 function createGetMailConfigApi() {
@@ -61,6 +61,7 @@ function createGetMailConfigApi() {
   return new Function('shared', `
 const ICLOUD_PROVIDER = 'icloud';
 const GMAIL_PROVIDER = 'gmail';
+const YAHOO_PROVIDER = 'yahoo';
 const HOTMAIL_PROVIDER = 'hotmail-api';
 const LUCKMAIL_PROVIDER = 'luckmail-api';
 const CLOUDFLARE_TEMP_EMAIL_PROVIDER = 'cloudflare-temp-email';
@@ -96,6 +97,7 @@ test('normalizeMailProvider keeps icloud provider', () => {
   const api = new Function(`
 const ICLOUD_PROVIDER = 'icloud';
 const GMAIL_PROVIDER = 'gmail';
+const YAHOO_PROVIDER = 'yahoo';
 const HOTMAIL_PROVIDER = 'hotmail-api';
 const LUCKMAIL_PROVIDER = 'luckmail-api';
 const CLOUDFLARE_TEMP_EMAIL_PROVIDER = 'cloudflare-temp-email';
@@ -149,6 +151,21 @@ test('getMailConfig keeps provider metadata for 2925 mailboxes', () => {
     label: '2925 邮箱',
     inject: ['content/utils.js', 'content/operation-delay.js', 'content/mail-2925.js'],
     injectSource: 'mail-2925',
+  });
+});
+
+test('getMailConfig returns Yahoo mailbox injection config', () => {
+  const api = createGetMailConfigApi();
+
+  assert.deepEqual(api.getMailConfig({
+    mailProvider: 'yahoo',
+  }), {
+    source: 'yahoo-mail',
+    url: 'https://mail.yahoo.com/d/folders/1',
+    label: 'Yahoo 邮箱',
+    navigateOnReuse: true,
+    inject: ['content/activation-utils.js', 'content/utils.js', 'content/yahoo-mail.js'],
+    injectSource: 'yahoo-mail',
   });
 });
 

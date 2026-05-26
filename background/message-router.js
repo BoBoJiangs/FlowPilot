@@ -1390,13 +1390,16 @@
             ...updates,
             resolvedSignupMethod: null,
           };
-          if (
+          const signupMethodRelevantChanged = (
             Object.prototype.hasOwnProperty.call(updates, 'phoneVerificationEnabled')
             || Object.prototype.hasOwnProperty.call(updates, 'plusModeEnabled')
             || Object.prototype.hasOwnProperty.call(updates, 'signupMethod')
             || Object.prototype.hasOwnProperty.call(updates, 'targetId')
             || Object.prototype.hasOwnProperty.call(updates, 'activeFlowId')
             || Object.prototype.hasOwnProperty.call(updates, 'accountContributionEnabled')
+          );
+          if (
+            signupMethodRelevantChanged
           ) {
             updates.signupMethod = resolveSignupMethod(nextSignupState);
           }
@@ -1428,6 +1431,9 @@
             ...canonicalSettingsUpdates,
             ...sessionUpdates,
           };
+          if (signupMethodRelevantChanged) {
+            stateUpdates.resolvedSignupMethod = null;
+          }
           if (Object.prototype.hasOwnProperty.call(canonicalSettingsUpdates, 'activeFlowId')
             && !Object.prototype.hasOwnProperty.call(stateUpdates, 'flowId')) {
             stateUpdates.flowId = canonicalSettingsUpdates.activeFlowId;

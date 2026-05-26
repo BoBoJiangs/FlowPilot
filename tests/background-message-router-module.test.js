@@ -554,6 +554,7 @@ test('SAVE_SETTING rebuilds Plus node statuses when panel mode forces the effect
   assert.deepStrictEqual(broadcasts.at(-1), {
     targetId: 'cpa',
     signupMethod: 'email',
+    resolvedSignupMethod: null,
     oauthUrl: null,
     localhostUrl: null,
     oauthFlowDeadlineAt: null,
@@ -622,6 +623,7 @@ test('SAVE_SETTING mirrors activeFlowId into flowId when switching to kiro flow'
     activeFlowId: 'kiro',
     flowId: 'kiro',
     signupMethod: 'email',
+    resolvedSignupMethod: null,
   });
 });
 
@@ -930,6 +932,7 @@ test('SAVE_SETTING re-resolves signup method when panel mode changes', async () 
   const api = new Function('self', `${source}; return self.MultiPageBackgroundMessageRouter;`)(globalScope);
   let state = {
     signupMethod: 'phone',
+    resolvedSignupMethod: 'phone',
     phoneVerificationEnabled: true,
     plusModeEnabled: false,
     targetId: 'sub2api',
@@ -958,6 +961,76 @@ test('SAVE_SETTING re-resolves signup method when panel mode changes', async () 
   assert.equal(response.ok, true);
   assert.equal(state.targetId, 'cpa');
   assert.equal(state.signupMethod, 'email');
+  assert.equal(state.resolvedSignupMethod, null);
+});
+
+test('SAVE_SETTING clears frozen signup method before rebuilding phone signup workflow state', async () => {
+  const source = fs.readFileSync('background/message-router.js', 'utf8');
+  const globalScope = { console };
+  const api = new Function('self', `${source}; return self.MultiPageBackgroundMessageRouter;`)(globalScope);
+  let state = {
+    signupMethod: 'email',
+    resolvedSignupMethod: 'email',
+    phoneVerificationEnabled: true,
+    plusModeEnabled: false,
+    plusPaymentMethod: 'paypal',
+    targetId: 'cpa',
+    currentNodeId: 'fill-password',
+    nodeStatuses: {
+      'open-chatgpt': 'completed',
+      'submit-signup-email': 'completed',
+      'fill-password': 'running',
+      'fetch-signup-code': 'pending',
+    },
+  };
+
+  const router = api.createMessageRouter({
+    addLog: async () => {},
+    buildLuckmailSessionSettingsPayload: () => ({}),
+    buildPersistentSettingsPayload: (input = {}) => Object.prototype.hasOwnProperty.call(input, 'signupMethod')
+      ? { signupMethod: input.signupMethod }
+      : {},
+    broadcastDataUpdate: () => {},
+    getNodeIdsForState: (nextState = {}) => (
+      String(nextState.resolvedSignupMethod || nextState.signupMethod || '').trim() === 'phone'
+        ? [
+          'open-chatgpt',
+          'submit-signup-email',
+          'fetch-signup-code',
+        ]
+        : [
+          'open-chatgpt',
+          'submit-signup-email',
+          'fill-password',
+          'fetch-signup-code',
+        ]
+    ),
+    getState: async () => ({ ...state }),
+    getStepIdsForState: () => [],
+    resolveSignupMethod: (nextState = {}) => (
+      String(nextState.signupMethod || '').trim() === 'phone' ? 'phone' : 'email'
+    ),
+    setPersistentSettings: async (updates) => ({ ...updates }),
+    setState: async (updates) => {
+      state = { ...state, ...updates };
+    },
+  });
+
+  const response = await router.handleMessage({
+    type: 'SAVE_SETTING',
+    payload: { signupMethod: 'phone' },
+  });
+
+  assert.equal(response.ok, true);
+  assert.equal(state.signupMethod, 'phone');
+  assert.equal(state.resolvedSignupMethod, null);
+  assert.equal(state.currentNodeId, '');
+  assert.deepStrictEqual(state.nodeStatuses, {
+    'open-chatgpt': 'pending',
+    'submit-signup-email': 'pending',
+    'fetch-signup-code': 'pending',
+  });
+  assert.equal(Object.prototype.hasOwnProperty.call(state.nodeStatuses, 'fill-password'), false);
 });
 
 test('SAVE_SETTING applies shared mode-switch normalization before persisting incompatible capability flags', async () => {

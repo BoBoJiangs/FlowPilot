@@ -58,6 +58,21 @@
         { hostnames: ['mail.google.com'] },
       ],
     },
+    'yahoo-mail': {
+      flowId: null,
+      kind: 'mail-provider',
+      label: 'Yahoo \u90ae\u7bb1',
+      readyPolicy: 'top-frame-only',
+      family: 'yahoo-mail-family',
+      driverId: 'content/yahoo-mail',
+      cleanupScopes: [],
+      detectionMatchers: [
+        { hostnames: ['mail.yahoo.com'] },
+      ],
+      familyMatchers: [
+        { hostnames: ['mail.yahoo.com'] },
+      ],
+    },
     'icloud-mail': {
       flowId: null,
       kind: 'mail-provider',
@@ -137,6 +152,10 @@
     },
     'content/gmail-mail': {
       sourceId: 'gmail-mail',
+      commands: ['POLL_EMAIL'],
+    },
+    'content/yahoo-mail': {
+      sourceId: 'yahoo-mail',
       commands: ['POLL_EMAIL'],
     },
     'content/icloud-mail': {

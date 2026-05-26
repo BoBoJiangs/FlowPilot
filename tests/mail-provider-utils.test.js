@@ -15,6 +15,7 @@ const {
 test('normalizeMailProvider accepts 126 and falls back to 163', () => {
   assert.equal(normalizeMailProvider('126'), '126');
   assert.equal(normalizeMailProvider('163-vip'), '163-vip');
+  assert.equal(normalizeMailProvider('yahoo'), 'yahoo');
   assert.equal(normalizeMailProvider(YYDS_MAIL_PROVIDER), YYDS_MAIL_PROVIDER);
   assert.equal(normalizeMailProvider('unknown-provider'), '163');
 });
@@ -46,6 +47,20 @@ test('getMailProviderConfig preserves the YYDS Mail provider sentinel', () => {
     {
       provider: YYDS_MAIL_PROVIDER,
       label: 'YYDS Mail',
+    }
+  );
+});
+
+test('getMailProviderConfig returns the Yahoo mailbox injection config', () => {
+  assert.deepEqual(
+    getMailProviderConfig({ mailProvider: 'yahoo' }),
+    {
+      source: 'yahoo-mail',
+      url: 'https://mail.yahoo.com/d/folders/1',
+      label: 'Yahoo 邮箱',
+      navigateOnReuse: true,
+      inject: ['content/activation-utils.js', 'content/utils.js', 'content/yahoo-mail.js'],
+      injectSource: 'yahoo-mail',
     }
   );
 });

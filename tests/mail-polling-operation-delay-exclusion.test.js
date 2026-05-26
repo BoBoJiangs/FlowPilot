@@ -48,6 +48,7 @@ test('mail polling handlers and cleanup handlers are not wrapped by operation de
     'content/icloud-mail.js': ['openMailItemAndRead', 'refreshInbox', 'handlePollEmail'],
     'content/mail-2925.js': ['handlePollEmail', 'openMailAndGetMessageText', 'deleteCurrentMailboxEmail', 'openMailAndDeleteAfterRead', 'deleteAllMailboxEmails', 'refreshInbox'],
     'content/gmail-mail.js': ['refreshInbox', 'openRowAndGetMessageText', 'handlePollEmail'],
+    'content/yahoo-mail.js': ['refreshInbox', 'openRowAndGetMessageText', 'handlePollEmail'],
     'content/inbucket-mail.js': ['refreshMailbox', 'openMailboxEntry', 'deleteCurrentMailboxMessage', 'handlePollEmail'],
   };
 

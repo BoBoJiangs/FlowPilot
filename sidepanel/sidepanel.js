@@ -1095,6 +1095,7 @@ const HOTMAIL_SERVICE_MODE_REMOTE = 'remote';
 const HOTMAIL_SERVICE_MODE_LOCAL = 'local';
 const ICLOUD_PROVIDER = 'icloud';
 const GMAIL_PROVIDER = 'gmail';
+const YAHOO_PROVIDER = 'yahoo';
 const GMAIL_ALIAS_GENERATOR = 'gmail-alias';
 const LUCKMAIL_PROVIDER = 'luckmail-api';
 const YYDS_MAIL_PROVIDER = 'yyds-mail';
@@ -1708,6 +1709,11 @@ const MAIL_PROVIDER_LOGIN_CONFIGS = {
   [GMAIL_PROVIDER]: {
     label: 'Gmail 邮箱',
     url: 'https://mail.google.com/mail/u/0/#inbox',
+    buttonLabel: '登录',
+  },
+  [YAHOO_PROVIDER]: {
+    label: 'Yahoo 邮箱',
+    url: 'https://mail.yahoo.com/d/folders/1',
     buttonLabel: '登录',
   },
   '163': {
@@ -11317,7 +11323,7 @@ function applySettingsState(state) {
     ? YYDS_MAIL_PROVIDER
     : 'yyds-mail';
   const restoredMailProvider = isCustomMailProvider(state?.mailProvider)
-    || [ICLOUD_PROVIDER, 'hotmail-api', GMAIL_PROVIDER, 'luckmail-api', yydsMailProvider, '163', '163-vip', '126', 'qq', 'inbucket', '2925', 'cloudflare-temp-email', 'cloudmail'].includes(String(state?.mailProvider || '').trim())
+    || [ICLOUD_PROVIDER, 'hotmail-api', GMAIL_PROVIDER, YAHOO_PROVIDER, 'luckmail-api', yydsMailProvider, '163', '163-vip', '126', 'qq', 'inbucket', '2925', 'cloudflare-temp-email', 'cloudmail'].includes(String(state?.mailProvider || '').trim())
     ? String(state?.mailProvider || '163').trim()
     : (String(state?.emailGenerator || '').trim().toLowerCase() === 'custom'
       || String(state?.emailGenerator || '').trim().toLowerCase() === 'manual'

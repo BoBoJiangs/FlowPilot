@@ -26,6 +26,7 @@ function detectScriptSource({
     || hostname.endsWith('.mail.126.com')
   ) return 'mail-163';
   if (hostname === 'mail.google.com') return 'gmail-mail';
+  if (hostname === 'mail.yahoo.com' || hostname.endsWith('.mail.yahoo.com')) return 'yahoo-mail';
   if (hostname === 'www.icloud.com' || hostname === 'www.icloud.com.cn') return 'icloud-mail';
   if (url.includes('duckduckgo.com/email/settings/autofill')) return 'duck-mail';
   if (url.includes('chatgpt.com')) return 'chatgpt';
@@ -561,6 +562,7 @@ function shouldReportReadyForFrame(source, isChildFrame) {
     'qq-mail',
     'mail-163',
     'gmail-mail',
+    'yahoo-mail',
     'mail-2925',
     'inbucket-mail',
     'plus-checkout',

@@ -97,6 +97,22 @@ return { detectScriptSource };
   );
 });
 
+test('detectScriptSource maps Yahoo mail hosts to canonical yahoo-mail source', () => {
+  const bundle = [extractFunction('detectScriptSource')].join('\n');
+  const api = new Function(`
+${bundle}
+return { detectScriptSource };
+`)();
+
+  assert.equal(
+    api.detectScriptSource({
+      url: 'https://mail.yahoo.com/d/folders/1',
+      hostname: 'mail.yahoo.com',
+    }),
+    'yahoo-mail'
+  );
+});
+
 test('detectScriptSource returns unknown-source for unrecognized pages', () => {
   const bundle = [extractFunction('detectScriptSource')].join('\n');
   const api = new Function(`
