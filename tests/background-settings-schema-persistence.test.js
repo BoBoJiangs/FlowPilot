@@ -74,6 +74,7 @@ const SETTINGS_SCHEMA_VIEW_KEYS = Object.freeze([
   'codex2apiUrl',
   'codex2apiAdminKey',
   'customPassword',
+  'accountFlowMode',
   'signupMethod',
   'phoneVerificationEnabled',
   'phoneSignupReloginAfterBindEmailEnabled',
@@ -92,6 +93,7 @@ const SETTINGS_SCHEMA_VIEW_KEY_SET = new Set(SETTINGS_SCHEMA_VIEW_KEYS);
 const PERSISTED_SETTING_DEFAULTS = {
   activeFlowId: DEFAULT_ACTIVE_FLOW_ID,
   targetId: 'cpa',
+  accountFlowMode: 'signup',
   signupMethod: 'email',
   plusModeEnabled: false,
   plusPaymentMethod: 'paypal',
@@ -288,6 +290,17 @@ test('buildPersistentSettingsPayload accepts schema-only input when requireKnown
   assert.equal(payload.settingsState.flows.openai.plus.plusAccountAccessStrategy, 'oauth');
 });
 
+test('buildPersistentSettingsPayload mirrors openai accountFlowMode into canonical settingsState and flat view', () => {
+  const api = buildHarness();
+
+  const payload = api.buildPersistentSettingsPayload({
+    accountFlowMode: 'existing_account_reauth',
+  }, { fillDefaults: true });
+
+  assert.equal(payload.accountFlowMode, 'existing_account_reauth');
+  assert.equal(payload.settingsState.flows.openai.signup.accountFlowMode, 'existing_account_reauth');
+});
+
 test('getPersistedSettings reads schema keys alongside legacy flat settings keys', async () => {
   const api = buildHarness(`
 let requestedKeys = [];
@@ -354,6 +367,7 @@ const chrome = {
                   },
                 },
                 signup: {
+                  accountFlowMode: 'existing_account_reauth',
                   signupMethod: 'email',
                   phoneVerificationEnabled: false,
                   phoneSignupReloginAfterBindEmailEnabled: false,
@@ -397,6 +411,7 @@ const chrome = {
   assert.equal(state.ipProxyEnabled, true);
   assert.equal(state.kiroRsUrl, 'https://kiro.example.com/admin');
   assert.equal(state.kiroRsKey, 'stored-key');
+  assert.equal(state.accountFlowMode, 'existing_account_reauth');
   assert.equal(state.plusAccountAccessStrategy, 'sub2api_codex_session');
   assert.equal(Object.prototype.hasOwnProperty.call(state, 'kiroRegion'), false);
   assert.deepEqual(state.stepExecutionRangeByFlow.kiro, {

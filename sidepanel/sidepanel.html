@@ -140,6 +140,13 @@
           <button id="btn-open-webchat2api-github" class="btn btn-ghost btn-xs data-inline-btn" type="button">GitHub</button>
         </div>
       </div>
+      <div class="data-row" id="row-account-flow-mode">
+        <span class="data-label">模式</span>
+        <select id="select-account-flow-mode" class="data-select" aria-label="OpenAI 账号流程模式">
+          <option value="signup">新账号注册</option>
+          <option value="existing_account_reauth">已有账号重新授权/绑手机号</option>
+        </select>
+      </div>
         <div id="contribution-mode-panel" class="contribution-mode-panel" hidden>
           <div class="contribution-mode-panel-header">
             <span class="section-label">贡献模式</span>
@@ -331,7 +338,7 @@
         </div>
       </div>
       <div class="data-row module-divider-start" id="row-custom-password">
-        <span class="data-label">账户密码</span>
+        <span id="label-account-password" class="data-label">账户密码</span>
         <div class="input-with-icon">
           <input type="password" id="input-password" class="data-input data-input-with-icon"
             placeholder="账户密码，留空则自动生成" />
@@ -678,10 +685,58 @@
         <input type="text" id="input-inbucket-mailbox" class="data-input" placeholder="例如 zju2001" />
       </div>
       <div class="data-row" id="row-auto-run-controls">
-        <span class="data-label">注册邮箱</span>
+        <span id="label-account-email" class="data-label">注册邮箱</span>
         <div class="data-inline">
           <input type="text" id="input-email" class="data-input" placeholder="自动生成或手动粘贴邮箱" />
           <button id="btn-fetch-email" class="btn btn-outline btn-sm data-inline-btn" type="button">获取</button>
+        </div>
+      </div>
+      <div class="data-row data-check-row" id="row-existing-account-pool" style="display:none;">
+        <span class="data-label">账号池</span>
+        <div class="hotmail-import-box">
+          <div class="section-mini-header">
+            <div class="section-mini-copy">
+              <span class="section-label">重新授权账号池</span>
+              <span class="data-value">自动模式按当前顺序逐个授权</span>
+            </div>
+            <div class="section-mini-actions">
+              <button id="btn-existing-account-pool-import" class="btn btn-ghost btn-xs" type="button">导入文件</button>
+              <button id="btn-existing-account-pool-delete-all" class="btn btn-ghost btn-xs" type="button">清空列表</button>
+            </div>
+          </div>
+          <textarea id="input-existing-account-pool" class="data-textarea mono" rows="5"
+            placeholder="每行一个账号，支持以下格式：&#10;user001@example.com&#10;user002@example.com----Password123!&#10;user003@example.com,Password123!"></textarea>
+          <div class="data-inline">
+            <button id="btn-existing-account-pool-apply" class="btn btn-primary btn-sm" type="button">确认导入</button>
+          </div>
+          <div id="existing-account-pool-summary" class="icloud-summary">每行一个账号。密码留空时会自动走一次性验证码登录。</div>
+          <div class="icloud-toolbar existing-account-pool-toolbar">
+            <input id="input-existing-account-pool-search" class="data-input account-pool-search" type="text"
+              placeholder="搜索邮箱 / 手机号 / 状态" />
+            <select id="select-existing-account-pool-filter" class="data-select icloud-filter account-pool-filter">
+              <option value="all">全部</option>
+              <option value="current">当前账号</option>
+              <option value="password">密码登录</option>
+              <option value="otp">验证码登录</option>
+              <option value="plus">Plus</option>
+              <option value="free">Free</option>
+              <option value="verified">验证成功</option>
+              <option value="received">已接码未成功</option>
+              <option value="unverified">未接码</option>
+              <option value="pending">待运行</option>
+            </select>
+          </div>
+          <div class="luckmail-bulkbar">
+            <label class="option-toggle luckmail-select-all" for="checkbox-existing-account-pool-select-all">
+              <input type="checkbox" id="checkbox-existing-account-pool-select-all" />
+              <span id="existing-account-pool-selection-summary">已选 0 个</span>
+            </label>
+            <div class="luckmail-bulk-actions">
+              <button id="btn-existing-account-pool-bulk-delete" class="btn btn-outline btn-xs" type="button">批量删除</button>
+            </div>
+          </div>
+          <div id="existing-account-pool-preview" class="existing-account-pool-preview" hidden></div>
+          <input id="input-existing-account-pool-import" type="file" accept=".txt,.csv,text/plain" hidden />
         </div>
       </div>
       <div class="data-row" id="row-step6-cookie-settings">
@@ -1661,6 +1716,13 @@
                     <span class="data-unit">次</span>
                   </div>
                 </div>
+                <div id="row-phone-reuse-max-uses" class="hero-sms-settings-cell" style="display:none;">
+                  <span class="hero-sms-settings-caption">同号绑定上限</span>
+                  <div class="setting-controls">
+                    <input type="number" id="input-phone-reuse-max-uses" class="data-input auto-delay-input" value="3" min="1" max="20" step="1" title="同一个手机号最多允许成功绑定几个邮箱账号；用于可复用号码和白嫖复用号码" />
+                    <span class="data-unit">个</span>
+                  </div>
+                </div>
                 <div id="row-phone-replacement-limit" class="hero-sms-settings-cell" style="display:none;">
                   <span class="hero-sms-settings-caption">换号上限</span>
                   <div class="setting-controls">
@@ -1710,7 +1772,7 @@
                 <div id="row-free-phone-reuse-auto-enabled" class="hero-sms-settings-cell hero-sms-reuse-cell" style="display:none;">
                   <span class="hero-sms-settings-caption">自动白嫖复用</span>
                   <div class="setting-controls hero-sms-toggle-controls">
-                    <label class="toggle-switch" for="input-free-phone-reuse-auto-enabled" title="开启后自动将已记录手机号设为等待短信状态，自动提交并轮询验证码；最多复用 3 次">
+                    <label class="toggle-switch" for="input-free-phone-reuse-auto-enabled" title="开启后自动将已记录手机号设为等待短信状态，自动提交并轮询验证码；复用次数受“同号绑定上限”控制">
                       <input type="checkbox" id="input-free-phone-reuse-auto-enabled" />
                       <span class="toggle-switch-track" aria-hidden="true">
                         <span class="toggle-switch-thumb"></span>

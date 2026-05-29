@@ -67,6 +67,7 @@ test('background account history settings are normalized independently from hotm
     extractFunction('normalizeNexSmsServiceCode'),
     extractFunction('normalizePhonePreferredActivation'),
     extractFunction('normalizePhoneVerificationReplacementLimit'),
+    extractFunction('normalizePhoneReuseMaxUses'),
     extractFunction('normalizePhoneCodeWaitSeconds'),
     extractFunction('normalizePhoneCodeTimeoutWindows'),
     extractFunction('normalizePhoneCodePollIntervalSeconds'),
@@ -95,6 +96,9 @@ const DEFAULT_VERIFICATION_RESEND_COUNT = 4;
 const PHONE_REPLACEMENT_LIMIT_MIN = 1;
 const PHONE_REPLACEMENT_LIMIT_MAX = 20;
 const DEFAULT_PHONE_VERIFICATION_REPLACEMENT_LIMIT = 3;
+const PHONE_REUSE_MAX_USES_MIN = 1;
+const PHONE_REUSE_MAX_USES_MAX = 20;
+const DEFAULT_PHONE_REUSE_MAX_USES = 3;
 const PHONE_CODE_WAIT_SECONDS_MIN = 15;
 const PHONE_CODE_WAIT_SECONDS_MAX = 300;
 const DEFAULT_PHONE_CODE_WAIT_SECONDS = 60;
@@ -271,6 +275,7 @@ return {
   assert.equal(api.normalizePersistentSettingValue('verificationResendCount', '-1'), 0);
   assert.equal(api.normalizePersistentSettingValue('phoneVerificationReplacementLimit', '9'), 9);
   assert.equal(api.normalizePersistentSettingValue('phoneVerificationReplacementLimit', '-1'), 1);
+  assert.equal(api.normalizePersistentSettingValue('phoneReuseMaxUses', '7'), 7);
   assert.equal(api.normalizePersistentSettingValue('phoneCodeWaitSeconds', '75'), 75);
   assert.equal(api.normalizePersistentSettingValue('phoneCodeTimeoutWindows', '3'), 3);
   assert.equal(api.normalizePersistentSettingValue('phoneCodePollIntervalSeconds', '6'), 6);
@@ -282,6 +287,8 @@ return {
   assert.equal(api.normalizePersistentSettingValue('heroSmsPreferredPrice', '0.051234'), '0.0512');
   assert.equal(api.normalizePersistentSettingValue('signupMethod', 'phone'), 'phone');
   assert.equal(api.normalizePersistentSettingValue('signupMethod', 'unknown'), 'email');
+  assert.equal(api.normalizePersistentSettingValue('accountFlowMode', 'existing_account_reauth'), 'existing_account_reauth');
+  assert.equal(api.normalizePersistentSettingValue('accountFlowMode', 'unknown'), 'signup');
   assert.equal(api.normalizePersistentSettingValue('activeFlowId', 'codex'), 'openai');
   assert.equal(api.normalizePersistentSettingValue('activeFlowId', 'kiro'), 'kiro');
   assert.equal(api.normalizePersistentSettingValue('targetId', 'sub2api'), 'sub2api');

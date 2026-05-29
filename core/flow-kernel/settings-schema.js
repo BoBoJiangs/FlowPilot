@@ -88,6 +88,13 @@
       return 'oauth';
     };
 
+    const normalizeOpenAiAccountFlowMode = (value = '') => {
+      const normalized = String(value || '').trim().toLowerCase();
+      return normalized === 'existing_account_reauth'
+        ? 'existing_account_reauth'
+        : 'signup';
+    };
+
     function getCanonicalFlowIds() {
       const ids = Array.isArray(getRegisteredFlowIds())
         ? getRegisteredFlowIds()
@@ -370,6 +377,12 @@
           codex2api: normalizeFlowTargetState('openai', 'codex2api', codex2apiSource, defaultOpenAiTargets.codex2api || {}),
         },
         signup: {
+          accountFlowMode: normalizeOpenAiAccountFlowMode(
+            input?.accountFlowMode
+            ?? currentFlow.signup?.accountFlowMode
+            ?? defaultOpenAiSignup.accountFlowMode
+            ?? 'signup'
+          ),
           signupMethod: String(
             input?.signupMethod
             ?? currentFlow.signup?.signupMethod
@@ -598,6 +611,7 @@
       next.codex2apiUrl = openaiState.targets.codex2api?.codex2apiUrl || '';
       next.codex2apiAdminKey = openaiState.targets.codex2api?.codex2apiAdminKey || '';
       next.customPassword = normalizedState.services.account.customPassword;
+      next.accountFlowMode = openaiState.signup?.accountFlowMode || 'signup';
       next.signupMethod = openaiState.signup?.signupMethod || 'email';
       next.phoneVerificationEnabled = Boolean(openaiState.signup?.phoneVerificationEnabled);
       next.phoneSignupReloginAfterBindEmailEnabled = Boolean(openaiState.signup?.phoneSignupReloginAfterBindEmailEnabled);

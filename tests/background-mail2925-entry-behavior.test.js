@@ -512,6 +512,78 @@ test('ensureMail2925MailboxSession stops when mailbox page email mismatches and 
   assert.match(stopCalls[0].logMessage, /与目标账号 target@2925\.com 不一致/);
 });
 
+test('ensureMail2925MailboxSession accepts managed 2925 alias targets when mailbox page shows the base account', async () => {
+  let currentState = {
+    autoRunning: false,
+    mail2925UseAccountPool: false,
+    mail2925BaseEmail: 'yixin911203@2925.com',
+    mail2925Accounts: [],
+    currentMail2925AccountId: null,
+  };
+  const stopCalls = [];
+  let sendCalls = 0;
+
+  const manager = api.createMail2925SessionManager({
+    addLog: async () => {},
+    broadcastDataUpdate: () => {},
+    chrome: {
+      tabs: {
+        get: async () => ({ id: 9, url: 'https://2925.com/#/mailList' }),
+      },
+      cookies: {
+        getAll: async () => [],
+        remove: async () => ({ ok: true }),
+      },
+      browsingData: {
+        removeCookies: async () => {},
+      },
+    },
+    ensureContentScriptReadyOnTab: async () => {},
+    findMail2925Account: mail2925Utils.findMail2925Account,
+    getMail2925AccountStatus: mail2925Utils.getMail2925AccountStatus,
+    getState: async () => currentState,
+    isAutoRunLockedState: () => false,
+    isMail2925AccountAvailable: mail2925Utils.isMail2925AccountAvailable,
+    MAIL2925_LIMIT_COOLDOWN_MS: mail2925Utils.MAIL2925_LIMIT_COOLDOWN_MS,
+    normalizeMail2925Account: mail2925Utils.normalizeMail2925Account,
+    normalizeMail2925Accounts: mail2925Utils.normalizeMail2925Accounts,
+    pickMail2925AccountForRun: mail2925Utils.pickMail2925AccountForRun,
+    requestStop: async (options = {}) => {
+      stopCalls.push(options);
+    },
+    reuseOrCreateTab: async () => 9,
+    sendToMailContentScriptResilient: async () => {
+      sendCalls += 1;
+      return {
+        loggedIn: true,
+        currentView: 'mailbox',
+        mailboxEmail: 'yixin911203@2925.com',
+      };
+    },
+    setPersistentSettings: async (payload) => {
+      currentState = { ...currentState, ...payload };
+    },
+    setState: async (updates) => {
+      currentState = { ...currentState, ...updates };
+    },
+    throwIfStopped: () => {},
+    upsertMail2925AccountInList: mail2925Utils.upsertMail2925AccountInList,
+  });
+
+  const result = await manager.ensureMail2925MailboxSession({
+    accountId: null,
+    forceRelogin: false,
+    allowLoginWhenOnLoginPage: false,
+    expectedMailboxEmail: 'yixin911203sq96k6@2925.com',
+    actionLabel: '步骤 8：确认 2925 邮箱登录态',
+  });
+
+  assert.equal(sendCalls, 1);
+  assert.equal(stopCalls.length, 0);
+  assert.equal(result.account, null);
+  assert.equal(result.result.usedExistingSession, true);
+});
+
 test('ensureMail2925MailboxSession does not crash when mailbox page is reused but top email cannot be detected', async () => {
   let currentState = {
     autoRunning: false,

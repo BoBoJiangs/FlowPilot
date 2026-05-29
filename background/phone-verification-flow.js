@@ -67,6 +67,8 @@
     const DEFAULT_PHONE_POLL_TIMEOUT_MS = 180000;
     const DEFAULT_PHONE_REQUEST_TIMEOUT_MS = 20000;
     const DEFAULT_PHONE_SUBMIT_ATTEMPTS = 3;
+    const PHONE_REUSE_MAX_USES_MIN = 1;
+    const PHONE_REUSE_MAX_USES_MAX = 20;
     const DEFAULT_PHONE_NUMBER_MAX_USES = 3;
     const DEFAULT_PHONE_NUMBER_REPLACEMENT_LIMIT = 3;
     const DEFAULT_PHONE_PRICE_LOOKUP_ATTEMPTS = 3;
@@ -504,6 +506,14 @@
       return /无法向此电话号码发送验证码|无法向.*(?:电话号码|手机号|号码).*发送(?:验证码|短信)|(?:不能|无法).*发送.*(?:验证码|短信).*(?:电话号码|手机号|号码)|(?:cannot|can't|could\s*not|couldn't|unable\s+to)\s+(?:send|deliver).{0,80}(?:verification\s+code|code|sms|text(?:\s+message)?).{0,80}(?:phone|number)|(?:verification\s+code|sms|text(?:\s+message)?).{0,80}(?:cannot|can't|could\s*not|couldn't|unable\s+to).{0,80}(?:send|deliver)/i.test(text);
     }
 
+    function isPhoneSmsChannelUnavailableError(value) {
+      const text = String(value || '').trim();
+      if (!text) {
+        return false;
+      }
+      return /PHONE_SMS_CHANNEL_UNAVAILABLE::|does\s+not\s+expose\s+(?:sms|a\s+usable\s+sms)\s+delivery|unsupported\s+delivery\s+channels|短信通道不可用|没有可用的短信通道/i.test(text);
+    }
+
     function isWhatsAppPhoneResendResult(value) {
       if (!value) {
         return false;
@@ -527,9 +537,45 @@
         return false;
       }
       return (
-        isPhoneNumberInvalidError(text)
+        isPhoneSmsChannelUnavailableError(text)
+        || isPhoneNumberInvalidError(text)
         || /failed\s+to\s+select\b.*add-phone\s+page|missing\s+the\s+country\s+option|could\s+not\s+determine\s+the\s+dial\s+code|add-phone\s+page\s+is\s+missing\s+the\s+phone\s+number\s+input|add-phone\s+page\s+is\s+missing\s+the\s+submit\s+button/i.test(text)
       );
+    }
+
+    function resolveConfiguredPhoneReuseMaxUses(state = {}, fallback = DEFAULT_PHONE_NUMBER_MAX_USES) {
+      const fallbackValue = Math.max(
+        PHONE_REUSE_MAX_USES_MIN,
+        Math.min(PHONE_REUSE_MAX_USES_MAX, Math.floor(Number(fallback) || DEFAULT_PHONE_NUMBER_MAX_USES))
+      );
+      const parsed = Math.floor(Number(state?.phoneReuseMaxUses));
+      if (!Number.isFinite(parsed)) {
+        return fallbackValue;
+      }
+      return Math.max(PHONE_REUSE_MAX_USES_MIN, Math.min(PHONE_REUSE_MAX_USES_MAX, parsed));
+    }
+
+    function applyConfiguredPhoneReuseLimits(state = {}, activation = null) {
+      if (!activation || typeof activation !== 'object' || Array.isArray(activation)) {
+        return null;
+      }
+      const provider = normalizePhoneSmsProvider(activation.provider || '');
+      const successfulUses = normalizeUseCount(activation.successfulUses);
+      if (provider === PHONE_SMS_PROVIDER_NEXSMS) {
+        return {
+          ...activation,
+          provider,
+          successfulUses,
+          maxUses: 1,
+        };
+      }
+      const configuredMaxUses = resolveConfiguredPhoneReuseMaxUses(state, activation.maxUses);
+      return {
+        ...activation,
+        ...(provider ? { provider } : {}),
+        successfulUses,
+        maxUses: Math.max(successfulUses, configuredMaxUses),
+      };
     }
 
     function normalizeCountryId(value, fallback = HERO_SMS_COUNTRY_ID) {
@@ -811,10 +857,7 @@
         return candidates;
       }
 
-      const cost = normalizeHeroSmsPrice(payload.cost);
-      if (cost !== null) {
-        candidates.push(cost);
-      }
+      collectHeroSmsObjectPriceFields(payload, candidates, { includeZeroStock: true });
 
       Object.entries(payload).forEach(([key]) => {
         const keyedPrice = normalizeHeroSmsPrice(key);
@@ -947,6 +990,7 @@
       const reasonMap = {
         returned_to_add_phone_loop: '反复返回添加手机号页',
         phone_number_used: '手机号已被使用',
+        sms_channel_unavailable: '页面没有可用短信通道',
         sms_not_received: '未收到短信',
         sms_timeout: '短信超时',
         resend_throttled: '重发短信被限流',
@@ -1426,6 +1470,20 @@
       return reusableActivation;
     }
 
+    function readReusableActivationFromState(state = {}) {
+      return applyConfiguredPhoneReuseLimits(
+        state,
+        normalizeActivation(state?.[REUSABLE_PHONE_ACTIVATION_STATE_KEY])
+      );
+    }
+
+    function readFreeReusableActivationFromState(state = {}) {
+      return applyConfiguredPhoneReuseLimits(
+        state,
+        normalizeFreeReusablePhoneActivation(state?.[FREE_REUSABLE_PHONE_ACTIVATION_STATE_KEY])
+      );
+    }
+
     function markActivationPhoneCodeReceived(activation) {
       const normalizedActivation = normalizeActivation(activation);
       if (!normalizedActivation) {
@@ -1520,8 +1578,12 @@
     }
 
     async function persistFreeReusableActivation(activation) {
+      const state = await getState();
       await setPhoneRuntimeState({
-        [FREE_REUSABLE_PHONE_ACTIVATION_STATE_KEY]: normalizeFreeReusablePhoneActivation(activation),
+        [FREE_REUSABLE_PHONE_ACTIVATION_STATE_KEY]: applyConfiguredPhoneReuseLimits(
+          state,
+          normalizeFreeReusablePhoneActivation(activation)
+        ),
       });
     }
 
@@ -2222,6 +2284,54 @@
       };
     }
 
+    function collectHeroSmsObjectPriceFields(payload, candidates = [], options = {}) {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return candidates;
+      }
+
+      const includeZeroStock = Boolean(options?.includeZeroStock);
+      const stockState = resolveHeroSmsStockState(payload);
+      const shouldIncludePrice = includeZeroStock || !stockState.hasStockField || stockState.stockCount > 0;
+      if (!shouldIncludePrice) {
+        return candidates;
+      }
+
+      [
+        'cost',
+        'price',
+        'rate',
+        'bidPrice',
+        'offerPrice',
+        'myPrice',
+        'userPrice',
+        'buyPrice',
+        'purchasePrice',
+        'tierPrice',
+      ].forEach((fieldName) => {
+        if (!Object.prototype.hasOwnProperty.call(payload, fieldName)) {
+          return;
+        }
+        const normalizedPrice = normalizeHeroSmsPrice(payload[fieldName]);
+        if (normalizedPrice !== null) {
+          candidates.push(normalizedPrice);
+        }
+      });
+
+      if (stockState.hasStockField) {
+        ['maxPrice', 'bid', 'offer'].forEach((fieldName) => {
+          if (!Object.prototype.hasOwnProperty.call(payload, fieldName)) {
+            return;
+          }
+          const normalizedPrice = normalizeHeroSmsPrice(payload[fieldName]);
+          if (normalizedPrice !== null) {
+            candidates.push(normalizedPrice);
+          }
+        });
+      }
+
+      return candidates;
+    }
+
     function collectHeroSmsPriceCandidates(payload, candidates = []) {
       if (Array.isArray(payload)) {
         payload.forEach((entry) => collectHeroSmsPriceCandidates(entry, candidates));
@@ -2231,13 +2341,7 @@
         return candidates;
       }
 
-      const cost = normalizeHeroSmsPrice(payload.cost);
-      if (cost !== null) {
-        const stockState = resolveHeroSmsStockState(payload);
-        if (!stockState.hasStockField || stockState.stockCount > 0) {
-          candidates.push(cost);
-        }
-      }
+      collectHeroSmsObjectPriceFields(payload, candidates);
 
       // Some HeroSMS responses expose price tiers as object keys:
       // { "0.05": { count: 0 }, "0.35": { count: 12 } }.
@@ -3587,12 +3691,12 @@
       if (normalizePhoneSmsProvider(state?.phoneSmsProvider) === PHONE_SMS_PROVIDER_FIVE_SIM) {
         const provider = getFiveSimProviderForState(state);
         if (provider) {
-          return provider.requestActivation(state, options);
+          return applyConfiguredPhoneReuseLimits(state, await provider.requestActivation(state, options));
         }
       }
       const config = resolvePhoneConfig(state);
       if (config.provider === PHONE_SMS_PROVIDER_5SIM) {
-        return requestFiveSimActivation(state, options);
+        return applyConfiguredPhoneReuseLimits(state, await requestFiveSimActivation(state, options));
       }
       if (config.provider === PHONE_SMS_PROVIDER_NEXSMS) {
         return requestNexSmsActivation(state, options);
@@ -3831,10 +3935,10 @@
                 if (activation) {
                   const numericPrice = Number(maxPrice);
                   rememberActivationAcquiredPrice(activation, numericPrice);
-                  return {
+                  return applyConfiguredPhoneReuseLimits(state, {
                     ...activation,
                     countryId: countryConfig.id,
-                  };
+                  });
                 }
                 const payloadText = describeHeroSmsPayload(payload);
                 if (isHeroSmsNoNumbersPayload(payload)) {
@@ -3931,7 +4035,10 @@
       if (getActivationProviderId(normalizedActivation, state) === PHONE_SMS_PROVIDER_FIVE_SIM) {
         const provider = getFiveSimProviderForState(state);
         if (provider) {
-          return provider.reuseActivation(state, normalizedActivation);
+          return applyConfiguredPhoneReuseLimits(
+            state,
+            await provider.reuseActivation(state, normalizedActivation)
+          );
         }
       }
 
@@ -3942,11 +4049,11 @@
           `/user/check/${encodeURIComponent(normalizedActivation.activationId)}`,
           '5sim reuse activation baseline'
         );
-        return {
+        return applyConfiguredPhoneReuseLimits(state, {
           ...normalizedActivation,
           source: '5sim-retained-reuse',
           ignoredPhoneCodeKeys: collectPhoneSmsCodeKeys(payload),
-        };
+        });
       }
       if (config.provider === PHONE_SMS_PROVIDER_NEXSMS) {
         throw new Error('NexSMS 当前流程不支持复用手机号订单。');
@@ -3960,7 +4067,7 @@
         const text = describeHeroSmsPayload(payload);
         throw new Error(`HeroSMS 复用手机号失败：${text || '空响应'}`);
       }
-      return nextActivation;
+      return applyConfiguredPhoneReuseLimits(state, nextActivation);
     }
 
     async function setPhoneActivationStatus(state = {}, activation, status, actionLabel) {
@@ -4077,7 +4184,7 @@
         updates[PHONE_ACTIVATION_STATE_KEY] = null;
         updates[PHONE_VERIFICATION_CODE_STATE_KEY] = '';
       }
-      const reusableActivation = normalizeActivation(state[REUSABLE_PHONE_ACTIVATION_STATE_KEY]);
+      const reusableActivation = readReusableActivationFromState(state);
       if (phoneNumbersMatch(reusableActivation?.phoneNumber, rejectedPhoneNumber)) {
         updates[REUSABLE_PHONE_ACTIVATION_STATE_KEY] = null;
       }
@@ -4088,7 +4195,7 @@
       if (nextReusablePool.length !== reusablePool.length) {
         updates[REUSABLE_PHONE_ACTIVATION_POOL_STATE_KEY] = nextReusablePool;
       }
-      const freeReusableActivation = normalizeFreeReusablePhoneActivation(state[FREE_REUSABLE_PHONE_ACTIVATION_STATE_KEY]);
+      const freeReusableActivation = readFreeReusableActivationFromState(state);
       if (phoneNumbersMatch(freeReusableActivation?.phoneNumber, rejectedPhoneNumber)) {
         updates[FREE_REUSABLE_PHONE_ACTIVATION_STATE_KEY] = null;
       }
@@ -4125,9 +4232,7 @@
       if (isFreeAutoReuseActivation(normalizedActivation)) {
         return true;
       }
-      const savedFreeActivation = normalizeFreeReusablePhoneActivation(
-        state?.[FREE_REUSABLE_PHONE_ACTIVATION_STATE_KEY]
-      );
+      const savedFreeActivation = readFreeReusableActivationFromState(state);
       return Boolean(
         savedFreeActivation
         && (
@@ -4190,7 +4295,10 @@
     }
 
     async function prepareFreeReusablePhoneActivation(state = {}, activation) {
-      const normalizedActivation = normalizeFreeReusablePhoneActivation(activation);
+      const normalizedActivation = applyConfiguredPhoneReuseLimits(
+        state,
+        normalizeFreeReusablePhoneActivation(activation)
+      );
       if (!normalizedActivation) {
         return {
           ok: false,
@@ -4940,31 +5048,40 @@
     }
 
     async function persistReusableActivation(activation) {
+      const state = await getState();
       await setPhoneRuntimeState({
-        [REUSABLE_PHONE_ACTIVATION_STATE_KEY]: normalizeActivation(activation) || null,
+        [REUSABLE_PHONE_ACTIVATION_STATE_KEY]: applyConfiguredPhoneReuseLimits(
+          state,
+          normalizeActivation(activation)
+        ) || null,
       });
     }
 
     function readReusableActivationPoolFromState(state = {}) {
-      return normalizeActivationPool(state?.[REUSABLE_PHONE_ACTIVATION_POOL_STATE_KEY]);
+      return normalizeActivationPool(state?.[REUSABLE_PHONE_ACTIVATION_POOL_STATE_KEY])
+        .map((entry) => applyConfiguredPhoneReuseLimits(state, entry))
+        .filter(Boolean);
     }
 
-    async function persistReusableActivationPool(pool = []) {
+    async function persistReusableActivationPool(pool = [], options = {}) {
+      const state = options?.state || await getState();
       await setPhoneRuntimeState({
-        [REUSABLE_PHONE_ACTIVATION_POOL_STATE_KEY]: normalizeActivationPool(pool),
+        [REUSABLE_PHONE_ACTIVATION_POOL_STATE_KEY]: normalizeActivationPool(pool)
+          .map((entry) => applyConfiguredPhoneReuseLimits(state, entry))
+          .filter(Boolean),
       });
     }
 
     async function upsertReusableActivationPool(activation, options = {}) {
-      const normalized = normalizeActivation(activation);
+      const state = options?.state || await getState();
+      const normalized = applyConfiguredPhoneReuseLimits(state, normalizeActivation(activation));
       if (!normalized) {
         return [];
       }
-      const state = options?.state || await getState();
       const existingPool = readReusableActivationPoolFromState(state);
       const filtered = existingPool.filter((entry) => !isSameActivation(entry, normalized));
       const nextPool = [normalized, ...filtered].slice(0, MAX_PHONE_REUSABLE_POOL);
-      await persistReusableActivationPool(nextPool);
+      await persistReusableActivationPool(nextPool, { state });
       return nextPool;
     }
 
@@ -4979,7 +5096,7 @@
       if (nextPool.length === existingPool.length) {
         return existingPool;
       }
-      await persistReusableActivationPool(nextPool);
+      await persistReusableActivationPool(nextPool, { state });
       return nextPool;
     }
 
@@ -4998,9 +5115,7 @@
       if (!normalizeFreePhoneReuseEnabled(state?.freePhoneReuseEnabled)) {
         return null;
       }
-      const freeReusableActivation = normalizeFreeReusablePhoneActivation(
-        state[FREE_REUSABLE_PHONE_ACTIVATION_STATE_KEY]
-      );
+      const freeReusableActivation = readFreeReusableActivationFromState(state);
       if (!freeReusableActivation) {
         return null;
       }
@@ -5187,7 +5302,7 @@
         }
       }
       const reuseEnabled = isPhoneSmsReuseEnabled(state);
-      const reusableActivation = normalizeActivation(state[REUSABLE_PHONE_ACTIVATION_STATE_KEY]);
+      const reusableActivation = readReusableActivationFromState(state);
       const reusableActivationPool = readReusableActivationPoolFromState(state);
       const reusableCandidates = [];
       const seenReusableKeys = new Set();
@@ -5426,9 +5541,7 @@
       if (normalizedActivation.source === 'free-manual-reuse') {
         return true;
       }
-      const savedFreeActivation = normalizeFreeReusablePhoneActivation(
-        state?.[FREE_REUSABLE_PHONE_ACTIVATION_STATE_KEY]
-      );
+      const savedFreeActivation = readFreeReusableActivationFromState(state);
       if (
         savedFreeActivation
         && (
@@ -5452,7 +5565,7 @@
       if (!normalizeFreePhoneReuseEnabled(latestState?.freePhoneReuseEnabled)) {
         return;
       }
-      if (normalizeFreeReusablePhoneActivation(latestState[FREE_REUSABLE_PHONE_ACTIVATION_STATE_KEY])) {
+      if (readFreeReusableActivationFromState(latestState)) {
         return;
       }
       const normalizedActivation = normalizeActivation(activation);
@@ -5482,7 +5595,10 @@
     }
 
     async function markFreeReusableActivationAfterAutoSuccess(state, activation) {
-      const normalizedActivation = normalizeFreeReusablePhoneActivation(activation);
+      const normalizedActivation = applyConfiguredPhoneReuseLimits(
+        state,
+        normalizeFreeReusablePhoneActivation(activation)
+      );
       if (!normalizedActivation || !isFreeAutoReuseActivation(activation)) {
         return;
       }
@@ -5494,9 +5610,7 @@
       if (isPhoneSignupIdentityState(latestState)) {
         return;
       }
-      const savedActivation = normalizeFreeReusablePhoneActivation(
-        latestState[FREE_REUSABLE_PHONE_ACTIVATION_STATE_KEY]
-      );
+      const savedActivation = readFreeReusableActivationFromState(latestState);
       if (!savedActivation || savedActivation.activationId !== normalizedActivation.activationId) {
         return;
       }
@@ -5544,9 +5658,7 @@
       if (isPhoneSignupIdentityState(latestState)) {
         return;
       }
-      const savedActivation = normalizeFreeReusablePhoneActivation(
-        latestState[FREE_REUSABLE_PHONE_ACTIVATION_STATE_KEY]
-      );
+      const savedActivation = readFreeReusableActivationFromState(latestState);
       if (
         !savedActivation
         || !(
@@ -5840,6 +5952,8 @@
       return {
         ...normalizedActivation,
         successfulUses: normalizedActivation.successfulUses + 1,
+        phoneVerificationSucceeded: true,
+        phoneVerificationSucceededAt: Date.now(),
       };
     }
 
@@ -6794,9 +6908,12 @@
             } catch (submitError) {
               const submitErrorText = String(submitError?.message || submitError || 'unknown error');
               if (isPhoneNumberDeliveryRefusedError(submitErrorText) || isRecoverableAddPhoneSubmitError(submitErrorText)) {
+                const missingSmsChannel = isPhoneSmsChannelUnavailableError(submitErrorText);
                 await rotateActivationAfterAddPhoneFailure(
                   submitErrorText,
-                  isPhoneNumberDeliveryRefusedError(submitErrorText) ? 'phone_delivery_refused' : 'add_phone_submit_failed',
+                  isPhoneNumberDeliveryRefusedError(submitErrorText)
+                    ? 'phone_delivery_refused'
+                    : (missingSmsChannel ? 'sms_channel_unavailable' : 'add_phone_submit_failed'),
                   { url: pageState?.url || '' }
                 );
                 continue;
@@ -6874,11 +6991,16 @@
                   || isPhoneNumberDeliveryRefusedError(retryRejectText)
                   || isRecoverableAddPhoneSubmitError(retryRejectText)
                 ) {
+                  const missingSmsChannel = isPhoneSmsChannelUnavailableError(retryRejectText);
                   await rotateActivationAfterAddPhoneFailure(
                     `add-phone keeps rejecting ${activation.phoneNumber} (${retryRejectText})`,
                     isPhoneNumberUsedError(retryRejectText)
                       ? 'phone_number_used'
-                      : (isPhoneNumberDeliveryRefusedError(retryRejectText) ? 'phone_delivery_refused' : 'add_phone_rejected'),
+                      : (
+                        isPhoneNumberDeliveryRefusedError(retryRejectText)
+                          ? 'phone_delivery_refused'
+                          : (missingSmsChannel ? 'sms_channel_unavailable' : 'add_phone_rejected')
+                      ),
                     submitResult || {}
                   );
                   continue;
@@ -7057,8 +7179,10 @@
             clearCountrySmsFailure(activation.countryId, activation.provider);
             shouldCancelActivation = false;
             await clearCurrentActivation();
+            const completedActivation = buildCompletedActivationSnapshot(activation);
             await setPhoneRuntimeState({
               phoneNumber: activation.phoneNumber,
+              phoneVerificationCompletedActivation: completedActivation,
             });
             addPhoneReentryWithSameActivation = 0;
             await addLog('步骤 9：手机号验证已完成，等待 OAuth 授权页。', 'ok');

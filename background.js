@@ -651,6 +651,9 @@ const AUTO_STEP_DELAY_MAX_ALLOWED_SECONDS = 600;
 const VERIFICATION_RESEND_COUNT_MIN = 0;
 const VERIFICATION_RESEND_COUNT_MAX = 20;
 const DEFAULT_VERIFICATION_RESEND_COUNT = 4;
+const PHONE_REUSE_MAX_USES_MIN = 1;
+const PHONE_REUSE_MAX_USES_MAX = 20;
+const DEFAULT_PHONE_REUSE_MAX_USES = 3;
 const PHONE_REPLACEMENT_LIMIT_MIN = 1;
 const PHONE_REPLACEMENT_LIMIT_MAX = 20;
 const DEFAULT_PHONE_VERIFICATION_REPLACEMENT_LIMIT = 3;
@@ -1317,6 +1320,8 @@ const PERSISTED_SETTING_DEFAULTS = {
   codex2apiUrl: DEFAULT_CODEX2API_URL,
   codex2apiAdminKey: '',
   customPassword: '',
+  accountFlowMode: 'signup',
+  existingAccountPoolEntries: [],
   plusModeEnabled: false,
   plusPaymentMethod: DEFAULT_PLUS_PAYMENT_METHOD,
   plusAccountAccessStrategy: 'oauth',
@@ -1382,6 +1387,7 @@ const PERSISTED_SETTING_DEFAULTS = {
   phoneSmsReuseEnabled: DEFAULT_HERO_SMS_REUSE_ENABLED,
   freePhoneReuseEnabled: true,
   freePhoneReuseAutoEnabled: true,
+  phoneReuseMaxUses: DEFAULT_PHONE_REUSE_MAX_USES,
   signupMethod: DEFAULT_SIGNUP_METHOD,
   phoneSmsProvider: DEFAULT_PHONE_SMS_PROVIDER,
   phoneSmsProviderOrder: [],
@@ -1486,6 +1492,7 @@ const SETTINGS_SCHEMA_VIEW_KEYS = Object.freeze([
   'codex2apiUrl',
   'codex2apiAdminKey',
   'customPassword',
+  'accountFlowMode',
   'signupMethod',
   'phoneVerificationEnabled',
   'phoneSignupReloginAfterBindEmailEnabled',
@@ -1540,6 +1547,7 @@ const DEFAULT_STATE = {
   heroSmsLastPriceUserLimit: '',
   heroSmsLastPriceAt: 0,
   pendingPhoneActivationConfirmation: null,
+  phoneVerificationCompletedActivation: null,
   autoRunning: false, // 当前是否处于自动运行中。
   autoRunPhase: 'idle', // 当前自动运行阶段。
   autoRunCurrentRun: 0, // 自动运行当前执行到第几轮。
@@ -2535,6 +2543,97 @@ function normalizeCustomEmailPoolEntryObjects(value = []) {
   return entries;
 }
 
+function normalizePhoneReuseMaxUses(value, fallback = DEFAULT_PHONE_REUSE_MAX_USES) {
+  const rawValue = String(value ?? '').trim();
+  const numeric = Number(rawValue);
+  if (!rawValue || !Number.isFinite(numeric)) {
+    return Math.min(
+      PHONE_REUSE_MAX_USES_MAX,
+      Math.max(PHONE_REUSE_MAX_USES_MIN, Math.floor(Number(fallback) || DEFAULT_PHONE_REUSE_MAX_USES))
+    );
+  }
+  return Math.min(
+    PHONE_REUSE_MAX_USES_MAX,
+    Math.max(PHONE_REUSE_MAX_USES_MIN, Math.floor(numeric))
+  );
+}
+
+function normalizeExistingAccountPoolEmail(value = '') {
+  return String(value || '').trim().toLowerCase();
+}
+
+function createExistingAccountPoolEntryId() {
+  return `existing-account-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function parseExistingAccountPoolLine(value = '') {
+  const rawLine = String(value || '').trim();
+  if (!rawLine) {
+    return null;
+  }
+
+  const delimiterMatch = rawLine.match(/^(.*?)\s*(----|\t|,|，|;|；|\|)\s*(.*)$/);
+  const rawEmail = delimiterMatch ? delimiterMatch[1] : rawLine;
+  const rawPassword = delimiterMatch ? delimiterMatch[3] : '';
+  const email = normalizeExistingAccountPoolEmail(rawEmail);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return null;
+  }
+
+  return {
+    email,
+    password: String(rawPassword || ''),
+  };
+}
+
+function normalizeExistingAccountPoolEntryObjects(value = []) {
+  const source = Array.isArray(value)
+    ? value
+    : String(value || '').split(/[\r\n]+/);
+  const seenEmails = new Set();
+  const entries = [];
+
+  for (const rawEntry of source) {
+    const parsedEntry = rawEntry && typeof rawEntry === 'object'
+      ? {
+        id: String(rawEntry.id || createExistingAccountPoolEntryId()),
+        email: normalizeExistingAccountPoolEmail(rawEntry.email || ''),
+        password: String(rawEntry.password || ''),
+      }
+      : (() => {
+        const parsedLine = parseExistingAccountPoolLine(rawEntry);
+        if (!parsedLine) {
+          return null;
+        }
+        return {
+          id: createExistingAccountPoolEntryId(),
+          email: parsedLine.email,
+          password: parsedLine.password,
+        };
+      })();
+    if (!parsedEntry?.email) {
+      continue;
+    }
+    if (seenEmails.has(parsedEntry.email)) {
+      continue;
+    }
+    seenEmails.add(parsedEntry.email);
+    entries.push(parsedEntry);
+  }
+
+  return entries;
+}
+
+function getExistingAccountPoolEntries(state = {}) {
+  return normalizeExistingAccountPoolEntryObjects(state?.existingAccountPoolEntries);
+}
+
+function getExistingAccountPoolEntryForRun(state = {}, targetRun = 1) {
+  const entries = getExistingAccountPoolEntries(state);
+  const numericRun = Math.max(1, Math.floor(Number(targetRun) || 1));
+  return entries[numericRun - 1] || null;
+}
+
 function isCustomEmailPoolGenerator(stateOrValue = {}) {
   const generator = typeof stateOrValue === 'string'
     ? stateOrValue
@@ -3136,6 +3235,10 @@ function normalizePersistentSettingValue(key, value) {
     case 'kiroRsKey':
     case 'grokWebchat2ApiAdminKey':
       return String(value || '').trim();
+    case 'accountFlowMode':
+      return String(value || '').trim().toLowerCase() === 'existing_account_reauth'
+        ? 'existing_account_reauth'
+        : 'signup';
     case 'vpsUrl':
       return String(value || '').trim();
     case 'vpsPassword':
@@ -3380,6 +3483,8 @@ function normalizePersistentSettingValue(key, value) {
       return normalizeVerificationResendCount(value, DEFAULT_VERIFICATION_RESEND_COUNT);
     case 'phoneVerificationReplacementLimit':
       return normalizePhoneVerificationReplacementLimit(value, DEFAULT_PHONE_VERIFICATION_REPLACEMENT_LIMIT);
+    case 'phoneReuseMaxUses':
+      return normalizePhoneReuseMaxUses(value, DEFAULT_PHONE_REUSE_MAX_USES);
     case 'phoneCodeWaitSeconds':
       return normalizePhoneCodeWaitSeconds(value, DEFAULT_PHONE_CODE_WAIT_SECONDS);
     case 'phoneCodeTimeoutWindows':
@@ -3401,6 +3506,8 @@ function normalizePersistentSettingValue(key, value) {
       return normalizeCustomEmailPool(value);
     case 'customEmailPoolEntries':
       return normalizeCustomEmailPoolEntryObjects(value);
+    case 'existingAccountPoolEntries':
+      return normalizeExistingAccountPoolEntryObjects(value);
     case 'autoDeleteUsedIcloudAlias':
     case 'accountRunHistoryTextEnabled':
     case 'cloudflareTempEmailUseRandomSubdomain':
@@ -3982,7 +4089,7 @@ function buildAutoRunFreshResetSettingsState(prevState = {}, activeFlowId = DEFA
   return mergeAutoRunKeepStateValue(currentSettingsState, nextSettingsStatePatch);
 }
 
-function buildFreshAutoRunKeepState(prevState = {}) {
+function buildFreshAutoRunKeepState(prevState = {}, context = {}) {
   const sourceState = isPlainObjectValue(prevState) ? prevState : {};
   const activeFlowId = self.MultiPageFlowRegistry?.normalizeFlowId
     ? self.MultiPageFlowRegistry.normalizeFlowId(
@@ -4027,6 +4134,25 @@ function buildFreshAutoRunKeepState(prevState = {}) {
     keepState.settingsSchemaVersion = Number(sourceState.settingsSchemaVersion) || 0;
   }
   keepState.settingsState = settingsState;
+  const targetRun = Math.max(0, Math.floor(Number(context?.targetRun) || 0));
+  const reauthPoolEntry = targetRun > 0
+    ? getExistingAccountPoolEntryForRun(sourceState, targetRun)
+    : null;
+  if (
+    activeFlowId === DEFAULT_ACTIVE_FLOW_ID
+    && String(sourceState.accountFlowMode || '').trim().toLowerCase() === 'existing_account_reauth'
+    && reauthPoolEntry?.email
+  ) {
+    const selectedEmail = reauthPoolEntry.email;
+    const selectedPassword = String(reauthPoolEntry.password || '');
+    keepState.email = selectedEmail;
+    keepState.password = selectedPassword;
+    keepState.customPassword = selectedPassword;
+    keepState.accountIdentifierType = 'email';
+    keepState.accountIdentifier = selectedEmail;
+    keepState.signupMethod = 'email';
+    keepState.resolvedSignupMethod = 'email';
+  }
   return keepState;
 }
 
@@ -8520,6 +8646,7 @@ function findLocalHeroSmsActivationForPhone(state = {}, phoneNumber = '') {
     state.currentPhoneActivation,
     state.reusablePhoneActivation,
     state.pendingPhoneActivationConfirmation,
+    state.phoneVerificationCompletedActivation,
     state.signupPhoneActivation,
     state.signupPhoneCompletedActivation,
     state.phonePreferredActivation,
@@ -8584,7 +8711,10 @@ async function setFreeReusablePhoneActivation(record = {}) {
     countryId,
     ...(countryLabel ? { countryLabel } : {}),
     successfulUses: Math.max(0, Math.floor(Number(record.successfulUses) || 0)),
-    maxUses: Math.max(1, Math.floor(Number(record.maxUses) || 3)),
+    maxUses: normalizePhoneReuseMaxUses(
+      record.maxUses,
+      localActivation?.maxUses ?? state?.phoneReuseMaxUses ?? DEFAULT_PHONE_REUSE_MAX_USES
+    ),
     source: 'free-manual-reuse',
     recordedAt: Date.now(),
     manualOnly: !activationId,
@@ -9721,6 +9851,7 @@ function getDownstreamStateResets(step, state = {}) {
       oauthFlowDeadlineAt: null,
       oauthFlowDeadlineSourceUrl: null,
       pendingPhoneActivationConfirmation: null,
+      phoneVerificationCompletedActivation: null,
       lastSignupCode: null,
       lastLoginCode: null,
       localhostUrl: null,
@@ -9740,6 +9871,7 @@ function getDownstreamStateResets(step, state = {}) {
       oauthFlowDeadlineAt: null,
       oauthFlowDeadlineSourceUrl: null,
       pendingPhoneActivationConfirmation: null,
+      phoneVerificationCompletedActivation: null,
       lastSignupCode: null,
       lastLoginCode: null,
       localhostUrl: null,
@@ -9758,6 +9890,7 @@ function getDownstreamStateResets(step, state = {}) {
       oauthFlowDeadlineAt: null,
       oauthFlowDeadlineSourceUrl: null,
       pendingPhoneActivationConfirmation: null,
+      phoneVerificationCompletedActivation: null,
       lastSignupCode: null,
       lastLoginCode: null,
       localhostUrl: null,
@@ -9810,6 +9943,7 @@ function getDownstreamStateResets(step, state = {}) {
       oauthFlowDeadlineAt: null,
       oauthFlowDeadlineSourceUrl: null,
       pendingPhoneActivationConfirmation: null,
+      phoneVerificationCompletedActivation: null,
       localhostUrl: null,
       currentPhoneVerificationCode: '',
       currentPhoneVerificationCountdownEndsAt: 0,
@@ -9820,6 +9954,7 @@ function getDownstreamStateResets(step, state = {}) {
   if (stepKey === 'plus-checkout-return' || stepKey === 'confirm-oauth') {
     return {
       pendingPhoneActivationConfirmation: null,
+      phoneVerificationCompletedActivation: null,
       plusReturnUrl: '',
       localhostUrl: null,
       currentPhoneVerificationCode: '',
@@ -9840,6 +9975,7 @@ function getDownstreamStateResets(step, state = {}) {
       oauthFlowDeadlineAt: null,
       oauthFlowDeadlineSourceUrl: null,
       pendingPhoneActivationConfirmation: null,
+      phoneVerificationCompletedActivation: null,
       localhostUrl: null,
       currentPhoneVerificationCode: '',
       currentPhoneVerificationCountdownEndsAt: 0,
@@ -9850,6 +9986,7 @@ function getDownstreamStateResets(step, state = {}) {
   if (stepKey === 'confirm-oauth') {
     return {
       pendingPhoneActivationConfirmation: null,
+      phoneVerificationCompletedActivation: null,
       localhostUrl: null,
     };
   }
@@ -12924,6 +13061,9 @@ async function runAutoSequenceFromNodeGraph(startNodeId, context = {}) {
     flowRegistry?.getFlowLabel?.(activeFlowId)
     || activeFlowId
   ).trim() || activeFlowId;
+  const reauthPoolEntry = targetRun > 0
+    ? getExistingAccountPoolEntryForRun(initialFlowState, targetRun)
+    : null;
 
   if (activeFlowId !== defaultActiveFlowId) {
     await broadcastAutoRunStatus('running', {
@@ -12988,6 +13128,17 @@ async function runAutoSequenceFromNodeGraph(startNodeId, context = {}) {
   }
 
   while (true) {
+
+  if (
+    !continueCurrentAttempt
+    && String(initialFlowState?.accountFlowMode || '').trim().toLowerCase() === 'existing_account_reauth'
+    && reauthPoolEntry?.email
+  ) {
+    await addLog(
+      `=== 目标 ${targetRun}/${totalRuns} 轮：重新授权账号池已就绪：${reauthPoolEntry.email}（${reauthPoolEntry.password ? '密码登录' : '一次性验证码登录'}）===`,
+      'info'
+    );
+  }
 
   if (continueCurrentAttempt) {
     await addLog(`=== 目标 ${targetRun}/${totalRuns} 轮：继续当前进度，从节点 ${currentStartNodeId} 开始（第 ${attemptRuns} 次尝试）===`, 'info');
@@ -14335,15 +14486,109 @@ async function executeStep3(state) {
 // ============================================================
 
 function getMailConfig(state) {
-  const provider = state.mailProvider || 'qq';
+  const normalizeEmailDomain = (value = '') => {
+    const candidate = String(value || '').trim().toLowerCase();
+    if (!candidate) return '';
+    const atIndex = candidate.lastIndexOf('@');
+    const domain = atIndex >= 0 ? candidate.slice(atIndex + 1) : candidate;
+    return domain.replace(/^\.+|\.+$/g, '');
+  };
+  const normalizeDomainSet = (...values) => {
+    const domains = new Set();
+    for (const value of values) {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          const normalized = normalizeEmailDomain(item);
+          if (normalized) {
+            domains.add(normalized);
+          }
+        }
+        continue;
+      }
+      const normalized = normalizeEmailDomain(value);
+      if (normalized) {
+        domains.add(normalized);
+      }
+    }
+    return domains;
+  };
+  const existingAccountReauthMode = String(state?.accountFlowMode || '').trim().toLowerCase() === 'existing_account_reauth';
+  const reauthEmail = existingAccountReauthMode
+    ? String(
+      state?.step8VerificationTargetEmail
+      || state?.email
+      || state?.registrationEmailState?.current
+      || ''
+    ).trim().toLowerCase()
+    : '';
+  const reauthEmailDomain = normalizeEmailDomain(reauthEmail);
+  let inferredProvider = '';
+  if (existingAccountReauthMode && reauthEmailDomain) {
+    if ([
+      'hotmail.com',
+      'outlook.com',
+      'live.com',
+      'msn.com',
+      'passport.com',
+      'passport.cn',
+      'outlook.jp',
+      'outlook.co.jp',
+      'hotmail.co.uk',
+      'live.cn',
+      'live.com.cn',
+      'windowslive.com',
+    ].includes(reauthEmailDomain)) {
+      inferredProvider = HOTMAIL_PROVIDER;
+    } else if (['icloud.com', 'me.com', 'mac.com', 'privaterelay.appleid.com'].includes(reauthEmailDomain)) {
+      inferredProvider = ICLOUD_PROVIDER;
+    } else if (['gmail.com', 'googlemail.com'].includes(reauthEmailDomain)) {
+      inferredProvider = GMAIL_PROVIDER;
+    } else if (['yahoo.com', 'yahoo.com.cn', 'yahoo.co.jp', 'ymail.com', 'rocketmail.com'].includes(reauthEmailDomain)) {
+      inferredProvider = YAHOO_PROVIDER;
+    } else if (reauthEmailDomain === '2925.com') {
+      inferredProvider = '2925';
+    } else if (reauthEmailDomain === 'qq.com') {
+      inferredProvider = 'qq';
+    } else if (reauthEmailDomain === '163.com') {
+      inferredProvider = '163';
+    } else if (['vip.163.com', '188.com'].includes(reauthEmailDomain)) {
+      inferredProvider = '163-vip';
+    } else if (reauthEmailDomain === '126.com') {
+      inferredProvider = '126';
+    } else {
+      const cloudflareTempEmailDomains = normalizeDomainSet(
+        state?.cloudflareTempEmailDomain,
+        state?.cloudflareTempEmailDomains
+      );
+      if (cloudflareTempEmailDomains.has(reauthEmailDomain)) {
+        inferredProvider = CLOUDFLARE_TEMP_EMAIL_PROVIDER;
+      } else {
+        const cloudMailDomains = normalizeDomainSet(
+          state?.cloudMailDomain,
+          state?.cloudMailDomains
+        );
+        if (cloudMailDomains.has(reauthEmailDomain)) {
+          inferredProvider = CLOUD_MAIL_PROVIDER;
+        }
+      }
+    }
+  }
+  const provider = inferredProvider || state.mailProvider || 'qq';
+  const autoDetectedProviderMeta = inferredProvider
+    ? {
+      autoDetected: true,
+      detectedEmail: reauthEmail,
+      detectedEmailDomain: reauthEmailDomain,
+    }
+    : {};
   const yydsMailProvider = typeof YYDS_MAIL_PROVIDER === 'string'
     ? YYDS_MAIL_PROVIDER
     : 'yyds-mail';
   if (provider === 'custom') {
-    return { provider: 'custom', label: '自定义邮箱' };
+    return { provider: 'custom', label: '自定义邮箱', ...autoDetectedProviderMeta };
   }
   if (provider === HOTMAIL_PROVIDER) {
-    return { provider: HOTMAIL_PROVIDER, label: 'Hotmail（API对接/本地助手）' };
+    return { provider: HOTMAIL_PROVIDER, label: 'Hotmail（API对接/本地助手）', ...autoDetectedProviderMeta };
   }
   if (provider === ICLOUD_PROVIDER) {
     const configuredHost = getConfiguredIcloudHostPreference(state)
@@ -14355,59 +14600,85 @@ function getMailConfig(state) {
       const forwardProvider = normalizeIcloudForwardMailProvider(state?.icloudForwardMailProvider);
       const forwardConfig = getSharedIcloudForwardMailConfig(forwardProvider);
       return {
+        provider: forwardProvider,
         ...forwardConfig,
         label: `iCloud 转发（${forwardConfig.label}）`,
         icloudForwarding: true,
+        ...autoDetectedProviderMeta,
       };
     }
     const loginUrl = getIcloudLoginUrlForHost(configuredHost) || 'https://www.icloud.com/';
     const mailUrl = getIcloudMailUrlForHost(configuredHost) || loginUrl;
     return {
+      provider: ICLOUD_PROVIDER,
       source: 'icloud-mail',
       url: mailUrl,
       label: 'iCloud 邮箱',
       navigateOnReuse: true,
+      ...autoDetectedProviderMeta,
     };
   }
   if (provider === GMAIL_PROVIDER) {
     return {
+      provider: GMAIL_PROVIDER,
       source: 'gmail-mail',
       url: 'https://mail.google.com/mail/u/0/#inbox',
       label: 'Gmail 邮箱',
       inject: ['content/activation-utils.js', 'content/utils.js', 'content/gmail-mail.js'],
       injectSource: 'gmail-mail',
+      ...autoDetectedProviderMeta,
     };
   }
   if (provider === YAHOO_PROVIDER) {
     return {
+      provider: YAHOO_PROVIDER,
       source: 'yahoo-mail',
       url: 'https://mail.yahoo.com/d/folders/1',
       label: 'Yahoo 邮箱',
       navigateOnReuse: true,
       inject: ['content/activation-utils.js', 'content/utils.js', 'content/yahoo-mail.js'],
       injectSource: 'yahoo-mail',
+      ...autoDetectedProviderMeta,
     };
   }
   if (provider === LUCKMAIL_PROVIDER) {
-    return { provider: LUCKMAIL_PROVIDER, label: 'LuckMail（API 购邮）' };
+    return { provider: LUCKMAIL_PROVIDER, label: 'LuckMail（API 购邮）', ...autoDetectedProviderMeta };
   }
   if (provider === CLOUDFLARE_TEMP_EMAIL_PROVIDER) {
-    return { provider: CLOUDFLARE_TEMP_EMAIL_PROVIDER, label: 'Cloudflare Temp Email' };
+    return { provider: CLOUDFLARE_TEMP_EMAIL_PROVIDER, label: 'Cloudflare Temp Email', ...autoDetectedProviderMeta };
   }
-  if (provider === 'cloudmail') {
-    return { provider: 'cloudmail', label: 'Cloud Mail' };
+  if (provider === CLOUD_MAIL_PROVIDER) {
+    return { provider: CLOUD_MAIL_PROVIDER, label: 'Cloud Mail', ...autoDetectedProviderMeta };
   }
   if (provider === yydsMailProvider) {
-    return { provider: yydsMailProvider, label: 'YYDS Mail' };
+    return { provider: yydsMailProvider, label: 'YYDS Mail', ...autoDetectedProviderMeta };
   }
   if (provider === '163') {
-    return { source: 'mail-163', url: 'https://mail.163.com/js6/main.jsp?df=mail163_letter#module=mbox.ListModule%7C%7B%22fid%22%3A1%2C%22order%22%3A%22date%22%2C%22desc%22%3Atrue%7D', label: '163 邮箱' };
+    return {
+      provider: '163',
+      source: 'mail-163',
+      url: 'https://mail.163.com/js6/main.jsp?df=mail163_letter#module=mbox.ListModule%7C%7B%22fid%22%3A1%2C%22order%22%3A%22date%22%2C%22desc%22%3Atrue%7D',
+      label: '163 邮箱',
+      ...autoDetectedProviderMeta,
+    };
   }
   if (provider === '163-vip') {
-    return { source: 'mail-163', url: 'https://webmail.vip.163.com/js6/main.jsp?df=mail163_letter#module=mbox.ListModule%7C%7B%22fid%22%3A1%2C%22order%22%3A%22date%22%2C%22desc%22%3Atrue%7D', label: '163 VIP 邮箱' };
+    return {
+      provider: '163-vip',
+      source: 'mail-163',
+      url: 'https://webmail.vip.163.com/js6/main.jsp?df=mail163_letter#module=mbox.ListModule%7C%7B%22fid%22%3A1%2C%22order%22%3A%22date%22%2C%22desc%22%3Atrue%7D',
+      label: '163 VIP 邮箱',
+      ...autoDetectedProviderMeta,
+    };
   }
   if (provider === '126') {
-    return { source: 'mail-163', url: 'https://mail.126.com/js6/main.jsp?df=mail163_letter#module=mbox.ListModule%7C%7B%22fid%22%3A1%2C%22order%22%3A%22date%22%2C%22desc%22%3Atrue%7D', label: '126 邮箱' };
+    return {
+      provider: '126',
+      source: 'mail-163',
+      url: 'https://mail.126.com/js6/main.jsp?df=mail163_letter#module=mbox.ListModule%7C%7B%22fid%22%3A1%2C%22order%22%3A%22date%22%2C%22desc%22%3Atrue%7D',
+      label: '126 邮箱',
+      ...autoDetectedProviderMeta,
+    };
   }
   if (provider === 'inbucket') {
     const host = normalizeInbucketOrigin(state.inbucketHost);
@@ -14419,12 +14690,14 @@ function getMailConfig(state) {
       return { error: 'Inbucket 邮箱名称为空。' };
     }
     return {
+      provider: 'inbucket',
       source: 'inbucket-mail',
       url: `${host}/m/${encodeURIComponent(mailbox)}/`,
       label: `Inbucket 邮箱（${mailbox}）`,
       navigateOnReuse: true,
       inject: ['content/activation-utils.js', 'content/utils.js', 'content/inbucket-mail.js'],
       injectSource: 'inbucket-mail',
+      ...autoDetectedProviderMeta,
     };
   }
   if (provider === '2925') {
@@ -14435,9 +14708,16 @@ function getMailConfig(state) {
       label: '2925 邮箱',
       inject: ['content/utils.js', 'content/operation-delay.js', 'content/mail-2925.js'],
       injectSource: 'mail-2925',
+      ...autoDetectedProviderMeta,
     };
   }
-  return { source: 'qq-mail', url: 'https://wx.mail.qq.com/', label: 'QQ 邮箱' };
+  return {
+    provider: 'qq',
+    source: 'qq-mail',
+    url: 'https://wx.mail.qq.com/',
+    label: 'QQ 邮箱',
+    ...autoDetectedProviderMeta,
+  };
 }
 
 function normalizeInbucketOrigin(rawValue) {

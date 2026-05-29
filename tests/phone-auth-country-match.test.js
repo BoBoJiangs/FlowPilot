@@ -9,6 +9,7 @@ const api = new Function('self', `${source}; return self.MultiPagePhoneAuth;`)(g
 function createFakeAddPhoneDom(config = {}) {
   const selectEvents = [];
   const hiddenInputEvents = [];
+  const deliveryChannelClicks = [];
   let submitClicked = false;
 
   const options = (
@@ -80,11 +81,52 @@ function createFakeAddPhoneDom(config = {}) {
   };
 
   const submitButton = {
+    disabled: false,
     type: 'submit',
+    textContent: '继续',
+    getAttribute() {
+      return '';
+    },
     click() {
       submitClicked = true;
     },
   };
+
+  const deliveryChannels = (
+    Array.isArray(config.deliveryChannels)
+      ? config.deliveryChannels
+      : [{ channel: 'sms', textContent: '短信', selected: true }]
+  ).map((entry) => {
+    const channel = String(entry?.channel || '').trim();
+    const button = {
+      __deliveryChannel: channel,
+      disabled: Boolean(entry?.disabled),
+      textContent: String(entry?.textContent || channel || '').trim(),
+      className: '',
+      querySelector() {
+        return null;
+      },
+      getAttribute(name) {
+        if (name === 'aria-pressed' || name === 'aria-selected' || name === 'aria-checked') {
+          return button.__selected ? 'true' : 'false';
+        }
+        if (name === 'aria-disabled') {
+          return button.disabled ? 'true' : 'false';
+        }
+        return '';
+      },
+      click() {
+        deliveryChannelClicks.push(channel);
+        deliveryChannels.forEach((option) => {
+          option.__selected = option === button;
+          option.className = option.__selected ? 'selected' : '';
+        });
+      },
+      __selected: Boolean(entry?.selected),
+    };
+    button.className = button.__selected ? 'selected' : '';
+    return button;
+  });
 
   const form = {
     querySelector(selector) {
@@ -104,6 +146,9 @@ function createFakeAddPhoneDom(config = {}) {
     querySelectorAll(selector) {
       if (selector === 'button[type="submit"], input[type="submit"]') {
         return [submitButton];
+      }
+      if (selector === 'button, [role="button"], [role="radio"], [role="tab"], label, input[type="radio"], input[type="button"]') {
+        return [...deliveryChannels, submitButton];
       }
       return [];
     },
@@ -126,12 +171,15 @@ function createFakeAddPhoneDom(config = {}) {
 
   return {
     document,
+    deliveryChannelClicks,
+    deliveryChannels,
     hiddenInputEvents,
     hiddenPhoneInput,
     phoneInput,
     select,
     selectEvents,
     submitButton,
+    getSelectedDeliveryChannel: () => deliveryChannels.find((option) => option.__selected)?.__deliveryChannel || '',
     wasSubmitClicked: () => submitClicked,
   };
 }
@@ -348,6 +396,218 @@ test('phone auth can auto-select country by dial code even when number has no pl
       displayedPhone: '',
       url: 'https://auth.openai.com/phone-verification',
     });
+  } finally {
+    global.document = originalDocument;
+    global.Event = originalEvent;
+    global.location = originalLocation;
+    Intl.DisplayNames = OriginalDisplayNames;
+  }
+});
+
+test('phone auth switches add-phone delivery channel to SMS before submit when WhatsApp is also available', async () => {
+  const originalDocument = global.document;
+  const originalEvent = global.Event;
+  const originalLocation = global.location;
+  const OriginalDisplayNames = Intl.DisplayNames;
+
+  const dom = createFakeAddPhoneDom({
+    options: [
+      { value: 'CO', textContent: 'Colombia (+57)', buttonText: 'Colombia (+57)' },
+      { value: 'GB', textContent: 'United Kingdom (+44)', buttonText: 'United Kingdom (+44)' },
+    ],
+    selectedIndex: 0,
+    deliveryChannels: [
+      { channel: 'whatsapp', textContent: 'WhatsApp', selected: true },
+      { channel: 'sms', textContent: '短信', selected: false },
+    ],
+  });
+  let phoneVerificationReady = false;
+  const clickOrder = [];
+
+  global.document = dom.document;
+  global.Event = class Event {
+    constructor(type) {
+      this.type = type;
+    }
+  };
+  global.location = { href: 'https://auth.openai.com/add-phone' };
+  Intl.DisplayNames = class DisplayNames {
+    of(regionCode) {
+      return regionCode;
+    }
+  };
+
+  try {
+    const helpers = api.createPhoneAuthHelpers({
+      fillInput: (element, value) => {
+        element.value = value;
+      },
+      getActionText: (element) => String(element?.textContent || ''),
+      getPageTextSnapshot: () => '',
+      getVerificationErrorText: () => '',
+      humanPause: async () => {},
+      isActionEnabled: (element) => element?.disabled !== true,
+      isAddPhonePageReady: () => true,
+      isConsentReady: () => false,
+      isPhoneVerificationPageReady: () => phoneVerificationReady,
+      isVisibleElement: () => true,
+      simulateClick: (element) => {
+        clickOrder.push(element === dom.submitButton ? 'submit' : (element?.__deliveryChannel || 'other'));
+        element.click?.();
+        if (element === dom.submitButton) {
+          phoneVerificationReady = true;
+          global.location.href = 'https://auth.openai.com/phone-verification';
+        }
+      },
+      sleep: async () => {},
+      throwIfStopped: () => {},
+      waitForElement: async () => null,
+    });
+
+    const result = await helpers.submitPhoneNumber({
+      countryLabel: 'Colombia',
+      phoneNumber: '573001234567',
+    });
+
+    assert.equal(dom.getSelectedDeliveryChannel(), 'sms');
+    assert.deepStrictEqual(dom.deliveryChannelClicks, ['sms']);
+    assert.deepStrictEqual(clickOrder, ['sms', 'submit']);
+    assert.equal(dom.wasSubmitClicked(), true);
+    assert.deepStrictEqual(result, {
+      phoneVerificationPage: true,
+      displayedPhone: '',
+      url: 'https://auth.openai.com/phone-verification',
+    });
+  } finally {
+    global.document = originalDocument;
+    global.Event = originalEvent;
+    global.location = originalLocation;
+    Intl.DisplayNames = OriginalDisplayNames;
+  }
+});
+
+test('phone auth rejects add-phone submission when only WhatsApp delivery is available', async () => {
+  const originalDocument = global.document;
+  const originalEvent = global.Event;
+  const originalLocation = global.location;
+  const OriginalDisplayNames = Intl.DisplayNames;
+
+  const dom = createFakeAddPhoneDom({
+    deliveryChannels: [
+      { channel: 'whatsapp', textContent: 'WhatsApp', selected: true },
+    ],
+  });
+
+  global.document = dom.document;
+  global.Event = class Event {
+    constructor(type) {
+      this.type = type;
+    }
+  };
+  global.location = { href: 'https://auth.openai.com/add-phone' };
+  Intl.DisplayNames = class DisplayNames {
+    of(regionCode) {
+      if (regionCode === 'TH') return 'Thailand';
+      if (regionCode === 'US') return 'United States';
+      return regionCode;
+    }
+  };
+
+  try {
+    const helpers = api.createPhoneAuthHelpers({
+      fillInput: (element, value) => {
+        element.value = value;
+      },
+      getActionText: () => '',
+      getPageTextSnapshot: () => '',
+      getVerificationErrorText: () => '',
+      humanPause: async () => {},
+      isActionEnabled: () => true,
+      isAddPhonePageReady: () => true,
+      isConsentReady: () => false,
+      isPhoneVerificationPageReady: () => false,
+      isVisibleElement: () => true,
+      simulateClick: (element) => {
+        element.click?.();
+      },
+      sleep: async () => {},
+      throwIfStopped: () => {},
+      waitForElement: async () => null,
+    });
+
+    await assert.rejects(
+      () => helpers.submitPhoneNumber({
+        countryLabel: 'Thailand',
+        phoneNumber: '66959916439',
+      }),
+      /PHONE_SMS_CHANNEL_UNAVAILABLE::/i
+    );
+    assert.equal(dom.wasSubmitClicked(), false);
+    assert.equal(dom.phoneInput.value, '');
+  } finally {
+    global.document = originalDocument;
+    global.Event = originalEvent;
+    global.location = originalLocation;
+    Intl.DisplayNames = OriginalDisplayNames;
+  }
+});
+
+test('phone auth rejects add-phone submission when delivery options are missing', async () => {
+  const originalDocument = global.document;
+  const originalEvent = global.Event;
+  const originalLocation = global.location;
+  const OriginalDisplayNames = Intl.DisplayNames;
+
+  const dom = createFakeAddPhoneDom({
+    deliveryChannels: [],
+  });
+
+  global.document = dom.document;
+  global.Event = class Event {
+    constructor(type) {
+      this.type = type;
+    }
+  };
+  global.location = { href: 'https://auth.openai.com/add-phone' };
+  Intl.DisplayNames = class DisplayNames {
+    of(regionCode) {
+      if (regionCode === 'TH') return 'Thailand';
+      if (regionCode === 'US') return 'United States';
+      return regionCode;
+    }
+  };
+
+  try {
+    const helpers = api.createPhoneAuthHelpers({
+      fillInput: (element, value) => {
+        element.value = value;
+      },
+      getActionText: () => '',
+      getPageTextSnapshot: () => '',
+      getVerificationErrorText: () => '',
+      humanPause: async () => {},
+      isActionEnabled: () => true,
+      isAddPhonePageReady: () => true,
+      isConsentReady: () => false,
+      isPhoneVerificationPageReady: () => false,
+      isVisibleElement: () => true,
+      simulateClick: (element) => {
+        element.click?.();
+      },
+      sleep: async () => {},
+      throwIfStopped: () => {},
+      waitForElement: async () => null,
+    });
+
+    await assert.rejects(
+      () => helpers.submitPhoneNumber({
+        countryLabel: 'Thailand',
+        phoneNumber: '66959916439',
+      }),
+      /PHONE_SMS_CHANNEL_UNAVAILABLE::/i
+    );
+    assert.equal(dom.wasSubmitClicked(), false);
+    assert.equal(dom.phoneInput.value, '');
   } finally {
     global.document = originalDocument;
     global.Event = originalEvent;

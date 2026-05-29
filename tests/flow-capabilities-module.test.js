@@ -337,3 +337,57 @@ test('flow capability registry forces SUB2API session import only for contributi
   assert.equal(capabilityState.canEditPlusAccountAccessStrategy, false);
   assert.equal(capabilityState.stepDefinitionOptions.plusAccountAccessStrategy, 'sub2api_codex_session');
 });
+
+test('flow capability registry locks OpenAI existing-account reauth mode to email OAuth tail settings', () => {
+  const api = loadApi();
+  const registry = api.createFlowCapabilityRegistry();
+
+  const capabilityState = registry.resolveSidepanelCapabilities({
+    state: {
+      activeFlowId: 'openai',
+      targetId: 'cpa',
+      accountFlowMode: 'existing_account_reauth',
+      signupMethod: 'phone',
+      phoneVerificationEnabled: true,
+      plusModeEnabled: true,
+      accountContributionEnabled: true,
+    },
+  });
+
+  assert.equal(capabilityState.accountFlowMode, 'existing_account_reauth');
+  assert.equal(capabilityState.canShowPhoneSettings, true);
+  assert.equal(capabilityState.canShowPlusSettings, false);
+  assert.equal(capabilityState.canShowContributionMode, false);
+  assert.equal(capabilityState.canUsePhoneSignup, false);
+  assert.equal(capabilityState.effectiveSignupMethod, 'email');
+  assert.equal(capabilityState.runtimeLocks.phoneVerificationEnabled, true);
+  assert.equal(capabilityState.runtimeLocks.plusModeEnabled, false);
+  assert.equal(capabilityState.runtimeLocks.accountContribution, false);
+  assert.equal(capabilityState.stepDefinitionOptions.accountFlowMode, 'existing_account_reauth');
+  assert.equal(capabilityState.stepDefinitionOptions.signupMethod, 'email');
+});
+
+test('flow capability registry silently normalizes incompatible Plus and contribution flags in existing-account reauth mode', () => {
+  const api = loadApi();
+  const registry = api.createFlowCapabilityRegistry();
+
+  const validation = registry.validateModeSwitch({
+    state: {
+      activeFlowId: 'openai',
+      targetId: 'cpa',
+      accountFlowMode: 'existing_account_reauth',
+      signupMethod: 'phone',
+      phoneVerificationEnabled: true,
+      plusModeEnabled: true,
+      accountContributionEnabled: true,
+    },
+    changedKeys: ['accountFlowMode'],
+  });
+
+  assert.equal(validation.ok, true);
+  assert.deepEqual(validation.normalizedUpdates, {
+    plusModeEnabled: false,
+    accountContributionEnabled: false,
+    signupMethod: 'email',
+  });
+});

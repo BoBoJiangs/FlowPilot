@@ -135,6 +135,10 @@
       return String(value || '').trim().toLowerCase();
     }
 
+    function isExistingAccountReauthMode(state = {}) {
+      return String(state?.accountFlowMode || '').trim().toLowerCase() === 'existing_account_reauth';
+    }
+
     function resolveBoundEmailLoginTarget(state = {}, visibleStep = 0) {
       const email = String(
         state?.step8VerificationTargetEmail
@@ -392,7 +396,41 @@
         }
       }
 
-      return String(state?.mail2925BaseEmail || '').trim().toLowerCase();
+      const configuredBaseEmail = String(state?.mail2925BaseEmail || '').trim().toLowerCase();
+      if (configuredBaseEmail) {
+        return configuredBaseEmail;
+      }
+
+      if (isExistingAccountReauthMode(state)) {
+        const currentEmail = String(state?.step8VerificationTargetEmail || state?.email || '').trim().toLowerCase();
+        if (/@2925\.com$/i.test(currentEmail)) {
+          return currentEmail;
+        }
+      }
+
+      return '';
+    }
+
+    function buildEffectiveMailState(state = {}, mail = {}) {
+      const effectiveProvider = String(mail?.provider || state?.mailProvider || '').trim().toLowerCase();
+      const nextState = effectiveProvider && effectiveProvider !== String(state?.mailProvider || '').trim().toLowerCase()
+        ? {
+          ...state,
+          mailProvider: effectiveProvider,
+        }
+        : {
+          ...state,
+        };
+
+      if (!isExistingAccountReauthMode(state)) {
+        return nextState;
+      }
+
+      nextState.emailGenerator = '';
+      if (effectiveProvider === '2925') {
+        nextState.mail2925Mode = 'receive';
+      }
+      return nextState;
     }
 
     async function focusOrOpenMailTab(mail) {
@@ -463,10 +501,17 @@
 
     async function completePostLoginPhoneVerificationSkippedOnOauth(visibleStep, options = {}) {
       const stepKey = options.stepKey || 'post-login-phone-verification';
-      await addLog(`步骤 ${visibleStep}：当前认证页已进入 OAuth 授权页，跳过手机号验证步骤。`, 'warn', {
+      const existingAccountReauthMode = String(options?.state?.accountFlowMode || '').trim().toLowerCase() === 'existing_account_reauth';
+      await addLog(
+        existingAccountReauthMode
+          ? '当前账号未进入补绑手机号链路，视为授权完成。'
+          : `步骤 ${visibleStep}：当前认证页已进入 OAuth 授权页，跳过手机号验证步骤。`,
+        existingAccountReauthMode ? 'ok' : 'warn',
+        {
         step: visibleStep,
         stepKey,
-      });
+        }
+      );
       if (typeof completeNodeFromBackground === 'function') {
         await completeNodeFromBackground(options.nodeId || 'post-login-phone-verification', {
           directOAuthConsentPage: true,
@@ -489,6 +534,7 @@
       if (pageState?.state === 'oauth_consent_page') {
         await completePostLoginPhoneVerificationSkippedOnOauth(visibleStep, {
           nodeId: state?.nodeId || runtime.fallbackNodeId,
+          state,
           stepKey: activeFetchLoginCodeStepKey,
         });
         return;
@@ -572,6 +618,7 @@
         : null;
       const mail = getMailConfig(preparedState);
       if (mail.error) throw new Error(mail.error);
+      const effectiveMailState = buildEffectiveMailState(preparedState, mail);
       const stepStartedAt = Date.now();
       const verificationFilterAfterTimestamp = mail.provider === '2925'
         ? Math.max(0, stepStartedAt - MAIL_2925_FILTER_LOOKBACK_MS)
@@ -590,11 +637,17 @@
       });
 
       await addLog(`步骤 ${visibleStep}：邮箱验证码页面已就绪，开始获取验证码。`, 'info');
+      if (mail.autoDetected) {
+        await addLog(
+          `步骤 ${visibleStep}：重新授权模式已根据邮箱后缀 ${mail.detectedEmailDomain || ''} 自动识别邮箱服务：${mail.label || mail.provider || '未知邮箱'}。`,
+          'info'
+        );
+      }
       if (shouldCompareVerificationEmail && displayedVerificationEmail) {
         await addLog(`步骤 ${visibleStep}：已固定当前验证码页显示邮箱 ${displayedVerificationEmail} 作为后续匹配目标。`, 'info');
       }
 
-      if (shouldUseCustomRegistrationEmail(preparedState)) {
+      if (shouldUseCustomRegistrationEmail(effectiveMailState)) {
         await confirmCustomVerificationStepBypass(8, {
           completionStep: visibleStep,
           promptStep: visibleStep,
@@ -605,7 +658,7 @@
       if (mail.source === 'icloud-mail' && typeof ensureIcloudMailSession === 'function') {
         await addLog(`步骤 ${visibleStep}：正在确认 iCloud 邮箱登录态...`, 'info');
         await ensureIcloudMailSession({
-          state: preparedState,
+          state: effectiveMailState,
           step: 8,
           actionLabel: `步骤 ${visibleStep}：确认 iCloud 邮箱登录态`,
         });
@@ -623,10 +676,10 @@
         await addLog(`步骤 ${visibleStep}：正在打开${mail.label}...`);
         if (mail.provider === '2925' && typeof ensureMail2925MailboxSession === 'function') {
           await ensureMail2925MailboxSession({
-            accountId: preparedState.currentMail2925AccountId || null,
+            accountId: effectiveMailState.currentMail2925AccountId || null,
             forceRelogin: false,
-            allowLoginWhenOnLoginPage: Boolean(preparedState?.mail2925UseAccountPool),
-            expectedMailboxEmail: getExpectedMail2925MailboxEmail(preparedState),
+            allowLoginWhenOnLoginPage: Boolean(effectiveMailState?.mail2925UseAccountPool),
+            expectedMailboxEmail: getExpectedMail2925MailboxEmail(effectiveMailState),
             actionLabel: `Step ${visibleStep}: ensure 2925 mailbox session`,
           });
         } else {
@@ -638,14 +691,14 @@
       }
 
       await resolveVerificationStep(8, {
-        ...preparedState,
+        ...effectiveMailState,
         step8VerificationTargetEmail: displayedVerificationEmail || '',
       }, mail, {
         completionStep: visibleStep,
         filterAfterTimestamp: verificationFilterAfterTimestamp,
         sessionKey: verificationSessionKey,
         disableTimeBudgetCap: mail.provider === '2925',
-        getRemainingTimeMs: getStep8RemainingTimeResolver(preparedState?.oauthUrl || '', visibleStep),
+        getRemainingTimeMs: getStep8RemainingTimeResolver(effectiveMailState?.oauthUrl || '', visibleStep),
         requestFreshCodeFirst: false,
         lastResendAt: latestResendAt,
         onResendRequestedAt: async (requestedAt) => {

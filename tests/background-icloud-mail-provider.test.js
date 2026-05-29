@@ -65,6 +65,7 @@ const YAHOO_PROVIDER = 'yahoo';
 const HOTMAIL_PROVIDER = 'hotmail-api';
 const LUCKMAIL_PROVIDER = 'luckmail-api';
 const CLOUDFLARE_TEMP_EMAIL_PROVIDER = 'cloudflare-temp-email';
+const CLOUD_MAIL_PROVIDER = 'cloudmail';
 const getSharedIcloudForwardMailConfig = shared.getIcloudForwardMailConfig;
 const normalizeIcloudTargetMailboxType = shared.normalizeIcloudTargetMailboxType;
 const normalizeIcloudForwardMailProvider = shared.normalizeIcloudForwardMailProvider;
@@ -117,6 +118,7 @@ test('getMailConfig returns icloud mail tab config with host preference', () => 
     mailProvider: 'icloud',
     icloudHostPreference: 'icloud.com',
   }), {
+    provider: 'icloud',
     source: 'icloud-mail',
     url: 'https://www.icloud.com/mail/',
     label: 'iCloud 邮箱',
@@ -132,6 +134,7 @@ test('getMailConfig reuses preferred icloud host when preference is auto', () =>
     icloudHostPreference: 'auto',
     preferredIcloudHost: 'icloud.com',
   }), {
+    provider: 'icloud',
     source: 'icloud-mail',
     url: 'https://www.icloud.com/mail/',
     label: 'iCloud 邮箱',
@@ -154,12 +157,33 @@ test('getMailConfig keeps provider metadata for 2925 mailboxes', () => {
   });
 });
 
+test('getMailConfig infers provider from email suffix in existing-account reauth mode', () => {
+  const api = createGetMailConfigApi();
+
+  assert.deepEqual(api.getMailConfig({
+    accountFlowMode: 'existing_account_reauth',
+    email: 'demo.user@gmail.com',
+    mailProvider: 'custom',
+  }), {
+    provider: 'gmail',
+    source: 'gmail-mail',
+    url: 'https://mail.google.com/mail/u/0/#inbox',
+    label: 'Gmail 邮箱',
+    inject: ['content/activation-utils.js', 'content/utils.js', 'content/gmail-mail.js'],
+    injectSource: 'gmail-mail',
+    autoDetected: true,
+    detectedEmail: 'demo.user@gmail.com',
+    detectedEmailDomain: 'gmail.com',
+  });
+});
+
 test('getMailConfig returns Yahoo mailbox injection config', () => {
   const api = createGetMailConfigApi();
 
   assert.deepEqual(api.getMailConfig({
     mailProvider: 'yahoo',
   }), {
+    provider: 'yahoo',
     source: 'yahoo-mail',
     url: 'https://mail.yahoo.com/d/folders/1',
     label: 'Yahoo 邮箱',
@@ -178,6 +202,7 @@ test('getMailConfig uses icloud inbox config when host is com.cn and target mail
     icloudTargetMailboxType: 'icloud-inbox',
     icloudForwardMailProvider: 'gmail',
   }), {
+    provider: 'icloud',
     source: 'icloud-mail',
     url: 'https://www.icloud.com.cn/mail/',
     label: 'iCloud 邮箱',
@@ -194,6 +219,7 @@ test('getMailConfig uses forward mailbox config when target mailbox type is forw
     icloudTargetMailboxType: 'forward-mailbox',
     icloudForwardMailProvider: 'gmail',
   }), {
+    provider: 'gmail',
     source: 'gmail-mail',
     url: 'https://mail.google.com/mail/u/0/#inbox',
     label: 'iCloud 转发（Gmail 邮箱）',

@@ -20,6 +20,9 @@ test('step definitions module exposes ordered normal and Plus step metadata', ()
     signupMethod: 'phone',
     phoneSignupReloginAfterBindEmailEnabled: true,
   });
+  const existingAccountReauthSteps = api.getSteps({
+    accountFlowMode: 'existing_account_reauth',
+  });
   const goPaySteps = api.getSteps({ plusModeEnabled: true, plusPaymentMethod: 'gopay' });
   const gpcSteps = api.getSteps({ plusModeEnabled: true, plusPaymentMethod: 'gpc-helper' });
   const kiroSteps = api.getSteps({ activeFlowId: 'kiro' });
@@ -91,6 +94,20 @@ test('step definitions module exposes ordered normal and Plus step metadata', ()
   );
   assert.equal(phoneReloginSteps.find((step) => step.key === 'relogin-bound-email')?.title, '绑定邮箱后刷新 OAuth 并登录（邮箱）');
   assert.equal(phoneReloginSteps.find((step) => step.key === 'fetch-bind-email-code')?.title, '获取绑定邮箱验证码');
+  assert.deepStrictEqual(
+    existingAccountReauthSteps.map((step) => step.key),
+    [
+      'oauth-login',
+      'fetch-login-code',
+      'post-login-phone-verification',
+      'confirm-oauth',
+      'platform-verify',
+    ]
+  );
+  assert.deepStrictEqual(
+    existingAccountReauthSteps.map((step) => step.id),
+    [7, 8, 9, 10, 11]
+  );
 
   assert.deepStrictEqual(
     plusSteps.map((step) => step.key),
@@ -442,6 +459,7 @@ test('OpenAI OAuth workflow removes post-login phone verification when phone ver
     { label: 'plus paypal', options: { plusModeEnabled: true, phoneVerificationEnabled: false } },
     { label: 'plus gopay', options: { plusModeEnabled: true, plusPaymentMethod: 'gopay', phoneVerificationEnabled: false } },
     { label: 'phone relogin', options: { signupMethod: 'phone', phoneSignupReloginAfterBindEmailEnabled: true, phoneVerificationEnabled: false } },
+    { label: 'existing account reauth', options: { accountFlowMode: 'existing_account_reauth', phoneVerificationEnabled: false } },
   ].forEach(({ label, options }) => {
     const steps = api.getSteps(options);
     const nodes = api.getNodes(options);

@@ -57,6 +57,8 @@ test('sidepanel masks video-sensitive settings with reusable visibility controls
   });
 
   assert.match(source, /function installPrivacyMaskControls/);
+  assert.match(source, /function syncAccountEmailPrivacyMaskMode/);
+  assert.match(source, /syncAccountEmailPrivacyMaskMode\(existingAccountReauthMode\);/);
   assert.match(source, /installPrivacyMaskControls\(\);\s*bindPasswordVisibilityToggles\(\);/);
 });
 

@@ -198,6 +198,10 @@ const window = {};
 const PLUS_ACCOUNT_ACCESS_STRATEGY_OAUTH = 'oauth';
 const PLUS_ACCOUNT_ACCESS_STRATEGY_SUB2API_CODEX_SESSION = 'sub2api_codex_session';
 const DEFAULT_PLUS_ACCOUNT_ACCESS_STRATEGY = PLUS_ACCOUNT_ACCESS_STRATEGY_OAUTH;
+const DEFAULT_ACTIVE_FLOW_ID = 'openai';
+const ACCOUNT_FLOW_MODE_SIGNUP = 'signup';
+const ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH = 'existing_account_reauth';
+const DEFAULT_ACCOUNT_FLOW_MODE = ACCOUNT_FLOW_MODE_SIGNUP;
 let cloudflareDomainEditMode = false;
 let cloudflareTempEmailDomainEditMode = false;
 const selectCfDomain = { value: 'example.com' };
@@ -296,6 +300,7 @@ function normalizeCloudflareTempEmailReceiveMailboxValue(value) { return String(
 function normalizeAutoRunThreadIntervalMinutes(value) { return Number(value) || 0; }
 function normalizeAutoStepDelaySeconds(value) { return value === '' ? null : Number(value); }
 function normalizeVerificationResendCount(value, fallback) { return Number.isFinite(Number(value)) ? Number(value) : fallback; }
+function normalizeAccountFlowMode(value = '') { return String(value || '').trim().toLowerCase() === ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH ? ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH : ACCOUNT_FLOW_MODE_SIGNUP; }
 function normalizePlusAccountAccessStrategy(value = '') { return String(value || '').trim().toLowerCase() === PLUS_ACCOUNT_ACCESS_STRATEGY_SUB2API_CODEX_SESSION ? PLUS_ACCOUNT_ACCESS_STRATEGY_SUB2API_CODEX_SESSION : PLUS_ACCOUNT_ACCESS_STRATEGY_OAUTH; }
 function normalizePhoneSmsProvider(value = '') { return String(value || '').trim().toLowerCase() === '5sim' ? '5sim' : 'hero-sms'; }
 function getSelectedPhoneSmsProvider() { return normalizePhoneSmsProvider(selectPhoneSmsProvider?.value || latestState?.phoneSmsProvider); }

@@ -263,6 +263,89 @@
       ).trim();
     }
 
+    function getActivationPhoneCodeReceivedAt(activation = null) {
+      if (!activation || typeof activation !== 'object' || Array.isArray(activation)) {
+        return 0;
+      }
+      const timestamp = Math.max(0, Number(activation.phoneCodeReceivedAt) || 0);
+      return Number.isFinite(timestamp) ? timestamp : 0;
+    }
+
+    function getActivationPhoneVerificationSucceededAt(activation = null) {
+      if (!activation || typeof activation !== 'object' || Array.isArray(activation)) {
+        return 0;
+      }
+      const timestamp = Math.max(0, Number(activation.phoneVerificationSucceededAt) || 0);
+      return Number.isFinite(timestamp) ? timestamp : 0;
+    }
+
+    function hasActivationPhoneCodeReceived(activation = null) {
+      if (!activation || typeof activation !== 'object' || Array.isArray(activation)) {
+        return false;
+      }
+      return Boolean(activation.phoneCodeReceived) || getActivationPhoneCodeReceivedAt(activation) > 0;
+    }
+
+    function hasActivationPhoneVerificationSucceeded(activation = null) {
+      if (!activation || typeof activation !== 'object' || Array.isArray(activation)) {
+        return false;
+      }
+      return Boolean(activation.phoneVerificationSucceeded) || getActivationPhoneVerificationSucceededAt(activation) > 0;
+    }
+
+    function resolveStatePhoneVerificationMeta(state = {}) {
+      const receiptCandidates = [
+        state?.signupPhoneCompletedActivation,
+        state?.phoneVerificationCompletedActivation,
+        state?.currentPhoneActivation,
+        state?.signupPhoneActivation,
+        state?.pendingPhoneActivationConfirmation,
+      ];
+      const successCandidates = [
+        state?.phoneVerificationCompletedActivation,
+        state?.signupPhoneCompletedActivation,
+      ];
+      let phoneCodeReceived = false;
+      let phoneCodeReceivedAt = 0;
+      let phoneVerificationSucceeded = false;
+      let phoneVerificationSucceededAt = 0;
+
+      receiptCandidates.forEach((activation) => {
+        if (!hasActivationPhoneCodeReceived(activation)) {
+          return;
+        }
+        phoneCodeReceived = true;
+        phoneCodeReceivedAt = Math.max(phoneCodeReceivedAt, getActivationPhoneCodeReceivedAt(activation));
+      });
+
+      successCandidates.forEach((activation) => {
+        if (!hasActivationPhoneVerificationSucceeded(activation)) {
+          return;
+        }
+        phoneVerificationSucceeded = true;
+        phoneVerificationSucceededAt = Math.max(
+          phoneVerificationSucceededAt,
+          getActivationPhoneVerificationSucceededAt(activation)
+        );
+      });
+
+      if (!phoneCodeReceived && String(state?.currentPhoneVerificationCode || '').trim()) {
+        phoneCodeReceived = true;
+      }
+
+      if (phoneVerificationSucceeded) {
+        phoneCodeReceived = true;
+        phoneCodeReceivedAt = Math.max(phoneCodeReceivedAt, phoneVerificationSucceededAt);
+      }
+
+      return {
+        phoneCodeReceived,
+        phoneCodeReceivedAt,
+        phoneVerificationSucceeded,
+        phoneVerificationSucceededAt,
+      };
+    }
+
     function resolveStatePhoneNumber(state = {}) {
       const identifierType = String(state?.accountIdentifierType || '').trim().toLowerCase();
       const accountIdentifierPhone = identifierType === 'phone'
@@ -273,6 +356,7 @@
         state?.phoneNumber
         || state?.signupPhoneNumber
         || accountIdentifierPhone
+        || getActivationPhoneNumber(state?.phoneVerificationCompletedActivation)
         || getActivationPhoneNumber(state?.signupPhoneCompletedActivation)
         || getActivationPhoneNumber(state?.signupPhoneActivation)
         || getActivationPhoneNumber(state?.currentPhoneActivation)
@@ -385,6 +469,22 @@
       const accountIdentifier = identity.accountIdentifier;
       const password = String(record.password ?? '').trim();
       const finalStatus = normalizeFinalStatus(record.finalStatus || record.status || '');
+      const phoneVerificationSucceeded = Boolean(
+        record.phoneVerificationSucceeded
+        || Math.max(0, Number(record.phoneVerificationSucceededAt) || 0) > 0
+        || (finalStatus === 'success' && phoneNumber)
+      );
+      const phoneVerificationSucceededAt = phoneVerificationSucceeded
+        ? Math.max(0, Number(record.phoneVerificationSucceededAt) || 0)
+        : 0;
+      const phoneCodeReceived = Boolean(
+        record.phoneCodeReceived
+        || Math.max(0, Number(record.phoneCodeReceivedAt) || 0) > 0
+        || phoneVerificationSucceeded
+      );
+      const phoneCodeReceivedAt = phoneCodeReceived
+        ? Math.max(0, Number(record.phoneCodeReceivedAt) || 0, phoneVerificationSucceededAt)
+        : 0;
 
       if (!accountIdentifier || !finalStatus) {
         return null;
@@ -420,6 +520,10 @@
         accountIdentifier,
         email,
         phoneNumber,
+        ...(phoneCodeReceived ? { phoneCodeReceived: true } : {}),
+        ...(phoneCodeReceivedAt > 0 ? { phoneCodeReceivedAt } : {}),
+        ...(phoneVerificationSucceeded ? { phoneVerificationSucceeded: true } : {}),
+        ...(phoneVerificationSucceededAt > 0 ? { phoneVerificationSucceededAt } : {}),
         password,
         finalStatus,
         finishedAt,
@@ -477,6 +581,18 @@
       const accountIdentifier = identity.accountIdentifier;
       const password = String(state.password || state.customPassword || '').trim();
       const finalStatus = normalizeFinalStatus(status);
+      const phoneVerificationMeta = resolveStatePhoneVerificationMeta(state);
+      const phoneCodeReceived = Boolean(
+        phoneVerificationMeta.phoneCodeReceived
+        || phoneVerificationMeta.phoneVerificationSucceeded
+      );
+      const phoneCodeReceivedAt = phoneCodeReceived
+        ? Math.max(0, Number(phoneVerificationMeta.phoneCodeReceivedAt) || 0)
+        : 0;
+      const phoneVerificationSucceeded = Boolean(phoneVerificationMeta.phoneVerificationSucceeded);
+      const phoneVerificationSucceededAt = phoneVerificationSucceeded
+        ? Math.max(0, Number(phoneVerificationMeta.phoneVerificationSucceededAt) || 0)
+        : 0;
 
       if (!accountIdentifier || !finalStatus) {
         return null;
@@ -515,6 +631,10 @@
         accountIdentifier,
         email,
         phoneNumber,
+        ...(phoneCodeReceived ? { phoneCodeReceived: true } : {}),
+        ...(phoneCodeReceivedAt > 0 ? { phoneCodeReceivedAt } : {}),
+        ...(phoneVerificationSucceeded ? { phoneVerificationSucceeded: true } : {}),
+        ...(phoneVerificationSucceededAt > 0 ? { phoneVerificationSucceededAt } : {}),
         password,
         finalStatus,
         finishedAt,
@@ -543,6 +663,9 @@
         record.accountIdentifier || record.email || record.phoneNumber,
         record.accountIdentifierType || (phoneKey && !emailKey ? 'phone' : 'email')
       );
+      const recordUsesPhoneIdentity = normalizeAccountIdentifierType(
+        record.accountIdentifierType || (phoneKey && !emailKey ? 'phone' : 'email')
+      ) === 'phone';
       const nextHistory = normalizedHistory.filter((item) => {
         const itemRecordId = String(item.recordId || '').trim();
         const itemEmailKey = String(item.email || '').trim().toLowerCase();
@@ -551,10 +674,24 @@
           item.accountIdentifier || item.email || item.phoneNumber,
           item.accountIdentifierType || (itemPhoneKey && !itemEmailKey ? 'phone' : 'email')
         );
+        const itemUsesPhoneIdentity = normalizeAccountIdentifierType(
+          item.accountIdentifierType || (itemPhoneKey && !itemEmailKey ? 'phone' : 'email')
+        ) === 'phone';
+        const shouldReplaceByPhoneIdentity = Boolean(
+          phoneKey
+          && itemPhoneKey
+          && itemPhoneKey === phoneKey
+          && (
+            recordUsesPhoneIdentity
+            || itemUsesPhoneIdentity
+            || !emailKey
+            || !itemEmailKey
+          )
+        );
         return itemRecordId !== recordId
           && itemIdentifierKey !== identifierKey
           && (!emailKey || itemEmailKey !== emailKey)
-          && (!phoneKey || itemPhoneKey !== phoneKey);
+          && !shouldReplaceByPhoneIdentity;
       });
 
       nextHistory.unshift(record);

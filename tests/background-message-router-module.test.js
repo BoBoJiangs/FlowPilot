@@ -16,6 +16,7 @@ test('background defaults enable free phone reuse switches', () => {
   assert.match(defaultsBlock, /freePhoneReuseEnabled:\s*true/);
   assert.match(defaultsBlock, /freePhoneReuseAutoEnabled:\s*true/);
   assert.match(defaultsBlock, /phoneSmsReuseEnabled:\s*DEFAULT_HERO_SMS_REUSE_ENABLED/);
+  assert.match(defaultsBlock, /phoneReuseMaxUses:\s*DEFAULT_PHONE_REUSE_MAX_USES/);
 });
 
 test('background free reusable phone setter does not depend on module-scoped phone flow constants', () => {
@@ -26,7 +27,8 @@ test('background free reusable phone setter does not depend on module-scoped pho
 
   assert.ok(setterStart >= 0, 'expected setFreeReusablePhoneActivation to exist');
   assert.doesNotMatch(setterBlock, /DEFAULT_PHONE_NUMBER_MAX_USES/);
-  assert.match(setterBlock, /maxUses:\s*Math\.max\(1,\s*Math\.floor\(Number\(record\.maxUses\)\s*\|\|\s*3\)\)/);
+  assert.match(setterBlock, /maxUses:\s*normalizePhoneReuseMaxUses\(/);
+  assert.match(setterBlock, /localActivation\?\.maxUses\s*\?\?\s*state\?\.phoneReuseMaxUses\s*\?\?\s*DEFAULT_PHONE_REUSE_MAX_USES/);
 });
 
 test('background free reusable phone setter can recover local HeroSMS activation id by phone number', () => {
@@ -555,6 +557,12 @@ test('SAVE_SETTING rebuilds Plus node statuses when panel mode forces the effect
     targetId: 'cpa',
     signupMethod: 'email',
     resolvedSignupMethod: null,
+    signupPhoneNumber: '',
+    signupPhoneActivation: null,
+    signupPhoneCompletedActivation: null,
+    signupPhoneVerificationRequestedAt: null,
+    signupPhoneVerificationPurpose: '',
+    phoneVerificationCompletedActivation: null,
     oauthUrl: null,
     localhostUrl: null,
     oauthFlowDeadlineAt: null,
@@ -624,6 +632,93 @@ test('SAVE_SETTING mirrors activeFlowId into flowId when switching to kiro flow'
     flowId: 'kiro',
     signupMethod: 'email',
     resolvedSignupMethod: null,
+    signupPhoneNumber: '',
+    signupPhoneActivation: null,
+    signupPhoneCompletedActivation: null,
+    signupPhoneVerificationRequestedAt: null,
+    signupPhoneVerificationPurpose: '',
+    phoneVerificationCompletedActivation: null,
+  });
+});
+
+test('SAVE_SETTING existing-account reauth clears signup phone runtime but preserves shared post-login phone runtime', async () => {
+  const source = fs.readFileSync('background/message-router.js', 'utf8');
+  const globalScope = { console };
+  const api = new Function('self', `${source}; return self.MultiPageBackgroundMessageRouter;`)(globalScope);
+  const broadcasts = [];
+  let state = {
+    activeFlowId: 'openai',
+    targetId: 'cpa',
+    accountFlowMode: 'signup',
+    signupMethod: 'phone',
+    resolvedSignupMethod: 'phone',
+    accountIdentifierType: 'phone',
+    accountIdentifier: '+447780579093',
+    signupPhoneNumber: '+447780579093',
+    signupPhoneActivation: { activationId: 'signup-live', phoneNumber: '+447780579093' },
+    signupPhoneCompletedActivation: { activationId: 'signup-done', phoneNumber: '+447780579093' },
+    signupPhoneVerificationRequestedAt: 123456,
+    signupPhoneVerificationPurpose: 'signup',
+    currentPhoneActivation: { activationId: 'post-login-live', phoneNumber: '+66950001111' },
+    phonePreferredActivation: { provider: 'hero-sms', activationId: 'preferred', phoneNumber: '+66950001111' },
+    plusModeEnabled: false,
+    plusPaymentMethod: 'paypal',
+  };
+
+  const router = api.createMessageRouter({
+    addLog: async () => {},
+    buildLuckmailSessionSettingsPayload: () => ({}),
+    buildPersistentSettingsPayload: (input = {}) => ({
+      accountFlowMode: String(input.accountFlowMode || 'signup'),
+    }),
+    broadcastDataUpdate: (payload) => broadcasts.push(payload),
+    getState: async () => ({ ...state }),
+    resolveSignupMethod: () => 'email',
+    setPersistentSettings: async (updates) => ({ ...updates }),
+    setState: async (updates) => {
+      state = { ...state, ...updates };
+    },
+  });
+
+  const response = await router.handleMessage({
+    type: 'SAVE_SETTING',
+    payload: {
+      accountFlowMode: 'existing_account_reauth',
+    },
+  });
+
+  assert.equal(response.ok, true);
+  assert.equal(state.accountFlowMode, 'existing_account_reauth');
+  assert.equal(state.signupMethod, 'email');
+  assert.equal(state.resolvedSignupMethod, null);
+  assert.equal(state.signupPhoneNumber, '');
+  assert.equal(state.signupPhoneActivation, null);
+  assert.equal(state.signupPhoneCompletedActivation, null);
+  assert.equal(state.signupPhoneVerificationRequestedAt, null);
+  assert.equal(state.signupPhoneVerificationPurpose, '');
+  assert.equal(state.accountIdentifierType, null);
+  assert.equal(state.accountIdentifier, '');
+  assert.deepStrictEqual(state.currentPhoneActivation, {
+    activationId: 'post-login-live',
+    phoneNumber: '+66950001111',
+  });
+  assert.deepStrictEqual(state.phonePreferredActivation, {
+    provider: 'hero-sms',
+    activationId: 'preferred',
+    phoneNumber: '+66950001111',
+  });
+  assert.deepStrictEqual(broadcasts.at(-1), {
+    accountFlowMode: 'existing_account_reauth',
+    signupMethod: 'email',
+    resolvedSignupMethod: null,
+    signupPhoneNumber: '',
+    signupPhoneActivation: null,
+    signupPhoneCompletedActivation: null,
+    signupPhoneVerificationRequestedAt: null,
+    signupPhoneVerificationPurpose: '',
+    phoneVerificationCompletedActivation: null,
+    accountIdentifierType: null,
+    accountIdentifier: '',
   });
 });
 

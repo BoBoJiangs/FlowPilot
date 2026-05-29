@@ -182,6 +182,60 @@
       return String(value || '').trim().toLowerCase();
     }
 
+    function parseMail2925Email(value = '') {
+      const normalizedValue = normalizeMailboxEmail(value);
+      const match = normalizedValue.match(/^([^@\s]+)@(2925\.com)$/i);
+      if (!match) {
+        return null;
+      }
+      return {
+        email: normalizedValue,
+        localPart: match[1],
+        domain: match[2].toLowerCase(),
+      };
+    }
+
+    function isMail2925AliasCompatibleEmail(candidateEmail = '', baseEmail = '') {
+      const parsedCandidate = parseMail2925Email(candidateEmail);
+      const parsedBase = parseMail2925Email(baseEmail);
+      if (!parsedCandidate || !parsedBase) {
+        return false;
+      }
+      return parsedCandidate.domain === parsedBase.domain
+        && (
+          parsedCandidate.localPart === parsedBase.localPart
+          || parsedCandidate.localPart.startsWith(parsedBase.localPart)
+        );
+    }
+
+    function areMail2925MailboxEmailsCompatible(actualMailboxEmail = '', expectedMailboxEmail = '', options = {}) {
+      const normalizedActualMailboxEmail = normalizeMailboxEmail(actualMailboxEmail);
+      const normalizedExpectedMailboxEmail = normalizeMailboxEmail(expectedMailboxEmail);
+      if (!normalizedActualMailboxEmail || !normalizedExpectedMailboxEmail) {
+        return false;
+      }
+      if (normalizedActualMailboxEmail === normalizedExpectedMailboxEmail) {
+        return true;
+      }
+
+      const baseCandidates = new Set([
+        normalizeMailboxEmail(options?.baseMailboxEmail || ''),
+        normalizedActualMailboxEmail,
+        normalizedExpectedMailboxEmail,
+      ].filter(Boolean));
+
+      for (const baseMailboxEmail of baseCandidates) {
+        if (
+          isMail2925AliasCompatibleEmail(normalizedActualMailboxEmail, baseMailboxEmail)
+          && isMail2925AliasCompatibleEmail(normalizedExpectedMailboxEmail, baseMailboxEmail)
+        ) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
     async function setCurrentMail2925Account(accountId, options = {}) {
       const { logMessage = '', updateLastUsedAt = false } = options;
       const state = await getState();
@@ -621,7 +675,19 @@
         throw new Error(`${MAIL2925_LIMIT_ERROR_PREFIX}${result.limitMessage || '子邮箱已达上限邮箱'}`);
       }
       const actualMailboxEmail = normalizeMailboxEmail(result?.mailboxEmail || '');
-      if (normalizedExpectedMailboxEmail && actualMailboxEmail && actualMailboxEmail !== normalizedExpectedMailboxEmail) {
+      const latestState = await getState();
+      const activeAccount = account || getCurrentMail2925Account(latestState);
+      const baseMailboxEmail = normalizeMailboxEmail(
+        activeAccount?.email
+        || latestState?.mail2925BaseEmail
+        || ''
+      );
+      const mailboxEmailCompatible = areMail2925MailboxEmailsCompatible(
+        actualMailboxEmail,
+        normalizedExpectedMailboxEmail,
+        { baseMailboxEmail }
+      );
+      if (normalizedExpectedMailboxEmail && actualMailboxEmail && !mailboxEmailCompatible) {
         if (allowLoginWhenOnLoginPage) {
           await addLog(
             `2925：当前邮箱页显示账号 ${actualMailboxEmail}，与目标账号 ${normalizedExpectedMailboxEmail} 不一致，准备登出当前账号并登录目标账号。`,
@@ -637,6 +703,12 @@
         }
         await failMailboxSession(
           `2925：${actionLabel}失败，当前邮箱页显示账号 ${actualMailboxEmail}，与目标账号 ${normalizedExpectedMailboxEmail} 不一致，且当前未启用 2925 账号池。`
+        );
+      }
+      if (normalizedExpectedMailboxEmail && actualMailboxEmail && actualMailboxEmail !== normalizedExpectedMailboxEmail && mailboxEmailCompatible) {
+        await addLog(
+          `2925：当前邮箱页显示账号 ${actualMailboxEmail}，目标账号 ${normalizedExpectedMailboxEmail} 属于同一别名链路，继续复用当前会话。`,
+          'info'
         );
       }
       if (normalizedExpectedMailboxEmail && !actualMailboxEmail && result?.currentView === 'mailbox') {

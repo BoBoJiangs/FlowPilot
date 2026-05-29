@@ -48,6 +48,36 @@
         matches: (record) => normalizeRetryCount(record.retryCount) > 0,
         metaLabel: '重试',
       },
+      plus: {
+        label: 'Plus',
+        className: 'is-plus',
+        matches: (record) => isPlusAccountRecord(record),
+        metaLabel: 'Plus',
+      },
+      free: {
+        label: 'Free',
+        className: 'is-free',
+        matches: (record) => !isPlusAccountRecord(record),
+        metaLabel: 'Free',
+      },
+      verified: {
+        label: '验证成功',
+        className: 'is-verified',
+        matches: (record) => getPhoneVerificationState(record) === 'verified',
+        metaLabel: '验证成功',
+      },
+      received: {
+        label: '已接码',
+        className: 'is-received',
+        matches: (record) => getPhoneVerificationState(record) === 'received',
+        metaLabel: '已接码未成功',
+      },
+      unverified: {
+        label: '未接码',
+        className: 'is-unverified',
+        matches: (record) => getPhoneVerificationState(record) === 'unverified',
+        metaLabel: '未接码',
+      },
     };
 
     let currentPage = 1;
@@ -191,6 +221,30 @@
       ).trim();
     }
 
+    function hasRecordedPhoneCodeReceipt(record = {}) {
+      return record?.phoneCodeReceived === true
+        || Math.max(0, Number(record?.phoneCodeReceivedAt) || 0) > 0;
+    }
+
+    function hasRecordedPhoneVerificationSuccess(record = {}) {
+      return record?.phoneVerificationSucceeded === true
+        || Math.max(0, Number(record?.phoneVerificationSucceededAt) || 0) > 0;
+    }
+
+    function getPhoneVerificationState(record = {}) {
+      const phoneNumber = getRecordPhoneNumber(record);
+      if (!phoneNumber) {
+        return 'unverified';
+      }
+      if (hasRecordedPhoneVerificationSuccess(record)) {
+        return 'verified';
+      }
+      if (hasRecordedPhoneCodeReceipt(record)) {
+        return 'received';
+      }
+      return 'unverified';
+    }
+
     function getRecordPrimaryIdentifier(record = {}) {
       const identifierType = getRecordIdentifierType(record);
       const email = getRecordEmail(record);
@@ -207,10 +261,63 @@
       if (identifierType === 'phone' && email) {
         return `邮箱 ${email}`;
       }
-      if (identifierType !== 'phone' && phoneNumber) {
-        return `绑定手机号 ${phoneNumber}`;
+      if (identifierType !== 'phone' && phoneNumber && getPhoneVerificationState(record) !== 'unverified') {
+        return `接码手机号 ${phoneNumber}`;
       }
       return '';
+    }
+
+    function isPlusAccountRecord(record = {}) {
+      return Boolean(record.plusModeEnabled);
+    }
+
+    function hasPhoneVerificationRecord(record = {}) {
+      return getPhoneVerificationState(record) !== 'unverified';
+    }
+
+    function getRecordTierLabel(record = {}) {
+      return isPlusAccountRecord(record) ? 'Plus' : 'Free';
+    }
+
+    function getRecordPhoneVerificationLabel(record = {}) {
+      const state = getPhoneVerificationState(record);
+      if (state === 'verified') {
+        return '验证成功';
+      }
+      if (state === 'received') {
+        return '已接码未成功';
+      }
+      return '未接码';
+    }
+
+    function getRecordBadgeItems(record = {}) {
+      const phoneVerificationState = getPhoneVerificationState(record);
+      return [
+        {
+          className: isPlusAccountRecord(record) ? 'is-plus' : 'is-free',
+          label: getRecordTierLabel(record),
+        },
+        {
+          className: phoneVerificationState === 'verified'
+            ? 'is-verified'
+            : (phoneVerificationState === 'received' ? 'is-received' : 'is-unverified'),
+          label: getRecordPhoneVerificationLabel(record),
+        },
+      ];
+    }
+
+    function renderRecordBadges(record = {}) {
+      const badges = getRecordBadgeItems(record);
+      if (!Array.isArray(badges) || badges.length === 0) {
+        return '';
+      }
+      return `
+        <div class="account-record-item-badges">
+          ${badges.map((badge) => `
+            <span class="account-record-item-badge ${escapeHtml(badge.className)}">${escapeHtml(badge.label)}</span>
+          `).join('')}
+        </div>
+      `;
     }
 
     function getRecordTitle(record = {}) {
@@ -247,6 +354,19 @@
           summary.retryRecordCount += 1;
         }
         summary.retryTotal += retryCount;
+        if (isPlusAccountRecord(record)) {
+          summary.plus += 1;
+        } else {
+          summary.free += 1;
+        }
+        const phoneVerificationState = getPhoneVerificationState(record);
+        if (phoneVerificationState === 'verified') {
+          summary.verified += 1;
+        } else if (phoneVerificationState === 'received') {
+          summary.received += 1;
+        } else {
+          summary.unverified += 1;
+        }
         return summary;
       }, {
         total: 0,
@@ -256,6 +376,11 @@
         stopped: 0,
         retryRecordCount: 0,
         retryTotal: 0,
+        plus: 0,
+        free: 0,
+        verified: 0,
+        received: 0,
+        unverified: 0,
       });
     }
 
@@ -469,6 +594,11 @@
         createStatChip('failed', summary.failed),
         createStatChip('stopped', summary.stopped),
         createStatChip('retry', summary.retryTotal),
+        createStatChip('plus', summary.plus),
+        createStatChip('free', summary.free),
+        createStatChip('verified', summary.verified),
+        createStatChip('received', summary.received),
+        createStatChip('unverified', summary.unverified),
       ].join('');
     }
 
@@ -571,6 +701,7 @@
                 <div class="account-record-item-identity">
                   <div class="account-record-item-email mono">${escapeHtml(primaryIdentifier)}</div>
                   ${secondaryIdentifier ? `<div class="account-record-item-secondary mono">${escapeHtml(secondaryIdentifier)}</div>` : ''}
+                  ${renderRecordBadges(record)}
                 </div>
               </div>
               <div class="account-record-item-side">

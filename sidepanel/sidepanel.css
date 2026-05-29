@@ -1894,6 +1894,154 @@ header {
   line-height: 1.6;
 }
 
+.existing-account-pool-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.existing-account-pool-item {
+  border: 1px solid var(--border);
+  background: var(--bg-base);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.existing-account-pool-item.is-current {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 1px var(--blue-glow);
+}
+
+.existing-account-pool-item-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.existing-account-pool-index {
+  color: var(--text-muted);
+  flex: 0 0 auto;
+  min-width: 28px;
+  padding-top: 2px;
+}
+
+.existing-account-pool-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.existing-account-pool-email-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.existing-account-pool-email {
+  color: var(--text-primary);
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.existing-account-pool-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.existing-account-pool-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.existing-account-pool-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+.existing-account-pool-tag.is-detected {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.existing-account-pool-tag.is-fallback {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+.existing-account-pool-tag.is-current {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.existing-account-pool-tag.is-plus {
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+}
+
+[data-theme="dark"] .existing-account-pool-tag.is-plus {
+  color: #fbbf24;
+}
+
+.existing-account-pool-tag.is-free {
+  background: color-mix(in srgb, var(--text-muted) 14%, transparent);
+  color: var(--text-secondary);
+}
+
+.existing-account-pool-tag.is-verified,
+.existing-account-pool-tag.is-status-success {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.existing-account-pool-tag.is-received {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.existing-account-pool-tag.is-unverified,
+.existing-account-pool-tag.is-status-failed {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.existing-account-pool-tag.is-pending,
+.existing-account-pool-tag.is-status-stopped {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+.existing-account-pool-tag.is-status-running {
+  background: rgba(8, 145, 178, 0.12);
+  color: var(--cyan);
+}
+
+.existing-account-pool-note {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.existing-account-pool-note.is-muted {
+  color: var(--text-muted);
+}
+
 .icloud-login-help {
   display: flex;
   align-items: center;
@@ -3097,6 +3245,36 @@ header {
   border-color: color-mix(in srgb, var(--amber) 16%, var(--border));
 }
 
+.account-records-stat.is-plus {
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue-soft) 78%, var(--bg-elevated));
+  border-color: color-mix(in srgb, var(--blue) 16%, var(--border));
+}
+
+.account-records-stat.is-free {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-base) 72%, var(--bg-elevated));
+  border-color: var(--border-subtle);
+}
+
+.account-records-stat.is-verified {
+  color: var(--green);
+  background: var(--green-soft);
+  border-color: color-mix(in srgb, var(--green) 16%, var(--border));
+}
+
+.account-records-stat.is-received {
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-color: color-mix(in srgb, var(--blue) 16%, var(--border));
+}
+
+.account-records-stat.is-unverified {
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber-soft) 72%, var(--bg-elevated));
+  border-color: color-mix(in srgb, var(--amber) 16%, var(--border));
+}
+
 .account-records-toolbar-actions .btn.is-active {
   background: var(--blue-soft);
   border-color: color-mix(in srgb, var(--blue) 22%, var(--border));
@@ -3223,6 +3401,50 @@ header {
   color: var(--text-secondary);
   font-size: 10px;
   font-weight: 600;
+}
+
+.account-record-item-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.account-record-item-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.account-record-item-badge.is-plus {
+  background: color-mix(in srgb, var(--blue-soft) 78%, var(--bg-elevated));
+  color: var(--blue);
+}
+
+.account-record-item-badge.is-free {
+  background: color-mix(in srgb, var(--bg-base) 72%, var(--bg-elevated));
+  color: var(--text-secondary);
+}
+
+.account-record-item-badge.is-verified {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.account-record-item-badge.is-received {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.account-record-item-badge.is-unverified {
+  background: color-mix(in srgb, var(--amber-soft) 72%, var(--bg-elevated));
+  color: var(--amber);
 }
 
 .account-record-item-side {

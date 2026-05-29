@@ -273,6 +273,23 @@
       preserveKeyFromState(updates, currentState, 'phonePreferredActivation');
     }
 
+    function buildAuthPathRuntimeResetState(currentState = {}) {
+      const resetState = {
+        resolvedSignupMethod: null,
+        signupPhoneNumber: '',
+        signupPhoneActivation: null,
+      signupPhoneCompletedActivation: null,
+      signupPhoneVerificationRequestedAt: null,
+      signupPhoneVerificationPurpose: '',
+      phoneVerificationCompletedActivation: null,
+    };
+      if (String(currentState?.accountIdentifierType || '').trim().toLowerCase() === 'phone') {
+        resetState.accountIdentifierType = null;
+        resetState.accountIdentifier = '';
+      }
+      return resetState;
+    }
+
     async function appendManualAccountRunRecordIfNeeded(status, stateOverride = null, reason = '') {
       if (typeof appendAccountRunRecord !== 'function') {
         return null;
@@ -1394,6 +1411,7 @@
             Object.prototype.hasOwnProperty.call(updates, 'phoneVerificationEnabled')
             || Object.prototype.hasOwnProperty.call(updates, 'plusModeEnabled')
             || Object.prototype.hasOwnProperty.call(updates, 'signupMethod')
+            || Object.prototype.hasOwnProperty.call(updates, 'accountFlowMode')
             || Object.prototype.hasOwnProperty.call(updates, 'targetId')
             || Object.prototype.hasOwnProperty.call(updates, 'activeFlowId')
             || Object.prototype.hasOwnProperty.call(updates, 'accountContributionEnabled')
@@ -1417,6 +1435,9 @@
           const plusAccountAccessStrategyChanged = Object.prototype.hasOwnProperty.call(updates, 'plusAccountAccessStrategy')
             && normalizePlusAccountAccessStrategyForDisplay(currentState?.plusAccountAccessStrategy || 'oauth')
               !== normalizePlusAccountAccessStrategyForDisplay(updates.plusAccountAccessStrategy || 'oauth');
+          const accountFlowModeChanged = Object.prototype.hasOwnProperty.call(updates, 'accountFlowMode')
+            && String(currentState?.accountFlowMode || '').trim().toLowerCase()
+              !== String(updates.accountFlowMode || '').trim().toLowerCase();
           const phoneSignupReloginAfterBindEmailChanged = Object.prototype.hasOwnProperty.call(updates, 'phoneSignupReloginAfterBindEmailEnabled')
             && Boolean(currentState?.phoneSignupReloginAfterBindEmailEnabled) !== Boolean(updates.phoneSignupReloginAfterBindEmailEnabled);
           const nextPlusModeEnabled = Object.prototype.hasOwnProperty.call(updates, 'plusModeEnabled')
@@ -1425,14 +1446,15 @@
           const stepModeChanged = modeChanged
             || (nextPlusModeEnabled && plusPaymentChanged)
             || (nextPlusModeEnabled && plusAccountAccessStrategyChanged)
-            || phoneSignupReloginAfterBindEmailChanged;
+            || phoneSignupReloginAfterBindEmailChanged
+            || accountFlowModeChanged;
           const canonicalSettingsUpdates = await setPersistentSettings(updates);
           const stateUpdates = {
             ...canonicalSettingsUpdates,
             ...sessionUpdates,
           };
           if (signupMethodRelevantChanged) {
-            stateUpdates.resolvedSignupMethod = null;
+            Object.assign(stateUpdates, buildAuthPathRuntimeResetState(currentState));
           }
           if (Object.prototype.hasOwnProperty.call(canonicalSettingsUpdates, 'activeFlowId')
             && !Object.prototype.hasOwnProperty.call(stateUpdates, 'flowId')) {

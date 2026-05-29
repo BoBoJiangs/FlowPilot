@@ -191,6 +191,11 @@ test('account run history helper accepts phone-only records without forcing emai
     accountIdentifierType: 'phone',
     accountIdentifier: '+6612345',
     signupPhoneNumber: '+6612345',
+    signupPhoneCompletedActivation: {
+      activationId: 'signup-1',
+      phoneNumber: '+6612345',
+      phoneVerificationSucceeded: true,
+    },
     password: '',
   }, 'success');
 
@@ -202,6 +207,8 @@ test('account run history helper accepts phone-only records without forcing emai
     accountIdentifier: '+6612345',
     email: '',
     phoneNumber: '+6612345',
+    phoneCodeReceived: true,
+    phoneVerificationSucceeded: true,
     password: '',
     finalStatus: 'success',
     finishedAt: record.finishedAt,
@@ -341,6 +348,7 @@ test('account run history merges email and phone identities from the same run', 
   assert.equal(failedRecord.accountIdentifierType, 'email');
   assert.equal(failedRecord.accountIdentifier, 'tmp@example.com');
   assert.equal(failedRecord.phoneNumber, '+44 7799 342687');
+  assert.equal(Boolean(failedRecord.phoneCodeReceived), false);
   assert.equal(failedRecord.failedNodeId, 'confirm-oauth');
   assert.equal(failedRecord.failedStep, null);
 
@@ -349,6 +357,11 @@ test('account run history merges email and phone identities from the same run', 
     accountIdentifier: 'tmp@example.com',
     email: 'tmp@example.com',
     phoneNumber: '447799342687',
+    phoneVerificationCompletedActivation: {
+      activationId: 'post-login-1',
+      phoneNumber: '447799342687',
+      phoneVerificationSucceeded: true,
+    },
     password: 'secret',
     accountRunHistoryHelperBaseUrl: '',
   });
@@ -356,6 +369,8 @@ test('account run history merges email and phone identities from the same run', 
   assert.equal(successRecord.recordId, 'tmp@example.com');
   assert.equal(successRecord.email, 'tmp@example.com');
   assert.equal(successRecord.phoneNumber, '447799342687');
+  assert.equal(successRecord.phoneCodeReceived, true);
+  assert.equal(successRecord.phoneVerificationSucceeded, true);
   assert.equal(storedHistory.length, 1);
   assert.equal(storedHistory[0].recordId, 'tmp@example.com');
   assert.equal(storedHistory[0].finalStatus, 'success');
@@ -396,6 +411,11 @@ test('account run history keeps phone as primary identity when phone signup late
     accountIdentifierType: 'phone',
     accountIdentifier: '+447700900123',
     signupPhoneNumber: '+447700900123',
+    signupPhoneCompletedActivation: {
+      activationId: 'signup-phone-1',
+      phoneNumber: '+447700900123',
+      phoneVerificationSucceeded: true,
+    },
     email: 'bound@example.com',
     password: 'secret',
     accountRunHistoryHelperBaseUrl: '',
@@ -409,6 +429,55 @@ test('account run history keeps phone as primary identity when phone signup late
   assert.equal(storedHistory.length, 1);
   assert.equal(storedHistory[0].recordId, 'phone:+447700900123');
   assert.equal(storedHistory[0].finalStatus, 'success');
+});
+
+test('account run history keeps separate email records even when they reuse the same phone number', async () => {
+  const source = fs.readFileSync('background/account-run-history.js', 'utf8');
+  const globalScope = {};
+  const api = new Function('self', `${source}; return self.MultiPageBackgroundAccountRunHistory;`)(globalScope);
+
+  let storedHistory = [{
+    recordId: 'first@example.com',
+    accountIdentifierType: 'email',
+    accountIdentifier: 'first@example.com',
+    email: 'first@example.com',
+    phoneNumber: '+573503949196',
+    phoneCodeReceived: true,
+    phoneVerificationSucceeded: true,
+    finalStatus: 'success',
+    finishedAt: '2026-04-17T04:31:00.000Z',
+  }];
+
+  const helpers = api.createAccountRunHistoryHelpers({
+    chrome: {
+      storage: {
+        local: {
+          get: async () => ({ accountRunHistory: storedHistory }),
+          set: async (payload) => {
+            storedHistory = payload.accountRunHistory;
+          },
+        },
+      },
+    },
+    getState: async () => ({}),
+    normalizeAccountRunHistoryHelperBaseUrl: () => '',
+  });
+
+  const record = await helpers.appendAccountRunRecord('node:post-login-phone-verification:stopped', {
+    accountIdentifierType: 'email',
+    accountIdentifier: 'second@example.com',
+    email: 'second@example.com',
+    phoneNumber: '+573503949196',
+    finalStatus: 'stopped',
+    failureDetail: '节点 post-login-phone-verification 已被用户停止。',
+    accountRunHistoryHelperBaseUrl: '',
+  }, '节点 post-login-phone-verification 已被用户停止。');
+
+  assert.equal(record.recordId, 'second@example.com');
+  assert.equal(Boolean(record.phoneCodeReceived), false);
+  assert.equal(storedHistory.length, 2);
+  assert.equal(storedHistory.some((item) => item.recordId === 'first@example.com' && item.phoneCodeReceived === true), true);
+  assert.equal(storedHistory.some((item) => item.recordId === 'second@example.com'), true);
 });
 
 test('account run history records preserve Plus and contribution mode flags', () => {

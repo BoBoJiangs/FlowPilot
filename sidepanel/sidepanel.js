@@ -54,6 +54,20 @@ const displayLocalhostUrl = document.getElementById('display-localhost-url');
 const displayStatus = document.getElementById('display-status');
 const statusBar = document.getElementById('status-bar');
 const inputEmail = document.getElementById('input-email');
+const rowAutoRunControls = document.getElementById('row-auto-run-controls');
+const rowExistingAccountPool = document.getElementById('row-existing-account-pool');
+const inputExistingAccountPool = document.getElementById('input-existing-account-pool');
+const btnExistingAccountPoolApply = document.getElementById('btn-existing-account-pool-apply');
+const existingAccountPoolSummary = document.getElementById('existing-account-pool-summary');
+const inputExistingAccountPoolSearch = document.getElementById('input-existing-account-pool-search');
+const selectExistingAccountPoolFilter = document.getElementById('select-existing-account-pool-filter');
+const checkboxExistingAccountPoolSelectAll = document.getElementById('checkbox-existing-account-pool-select-all');
+const existingAccountPoolSelectionSummary = document.getElementById('existing-account-pool-selection-summary');
+const btnExistingAccountPoolBulkDelete = document.getElementById('btn-existing-account-pool-bulk-delete');
+const existingAccountPoolPreview = document.getElementById('existing-account-pool-preview');
+const btnExistingAccountPoolImport = document.getElementById('btn-existing-account-pool-import');
+const btnExistingAccountPoolDeleteAll = document.getElementById('btn-existing-account-pool-delete-all');
+const inputExistingAccountPoolImport = document.getElementById('input-existing-account-pool-import');
 const inputSignupPhone = document.getElementById('input-signup-phone');
 const inputPassword = document.getElementById('input-password');
 const btnToggleVpsUrl = document.getElementById('btn-toggle-vps-url');
@@ -90,6 +104,10 @@ const btnImportSettings = document.getElementById('btn-import-settings');
 const inputImportSettingsFile = document.getElementById('input-import-settings-file');
 const labelSourceSelector = document.getElementById('label-source-selector');
 const selectPanelMode = document.getElementById('select-panel-mode');
+const rowAccountFlowMode = document.getElementById('row-account-flow-mode');
+const selectAccountFlowMode = document.getElementById('select-account-flow-mode');
+const labelAccountEmail = document.getElementById('label-account-email');
+const labelAccountPassword = document.getElementById('label-account-password');
 const btnOpenWebchat2ApiGithub = document.getElementById('btn-open-webchat2api-github');
 const rowVpsUrl = document.getElementById('row-vps-url');
 const inputVpsUrl = document.getElementById('input-vps-url');
@@ -260,6 +278,7 @@ const rowGoPayOtp = document.getElementById('row-gopay-otp');
 const inputGoPayOtp = document.getElementById('input-gopay-otp');
 const rowGoPayPin = document.getElementById('row-gopay-pin');
 const inputGoPayPin = document.getElementById('input-gopay-pin');
+const rowMailProvider = document.getElementById('row-mail-provider');
 const selectMailProvider = document.getElementById('select-mail-provider');
 const btnMailLogin = document.getElementById('btn-mail-login');
 const rowCustomMailProviderPool = document.getElementById('row-custom-mail-provider-pool');
@@ -470,6 +489,7 @@ const rowHeroSmsCurrentCode = document.getElementById('row-hero-sms-current-code
 const rowHeroSmsPreferredActivation = document.getElementById('row-hero-sms-preferred-activation');
 const rowPhoneCodeSettingsGroup = document.getElementById('row-phone-code-settings-group');
 const rowPhoneVerificationResendCount = document.getElementById('row-phone-verification-resend-count');
+const rowPhoneReuseMaxUses = document.getElementById('row-phone-reuse-max-uses');
 const rowPhoneReplacementLimit = document.getElementById('row-phone-replacement-limit');
 const rowPhoneCodeWaitSeconds = document.getElementById('row-phone-code-wait-seconds');
 const rowPhoneCodeTimeoutWindows = document.getElementById('row-phone-code-timeout-windows');
@@ -490,6 +510,7 @@ const inputNexSmsServiceCode = document.getElementById('input-nex-sms-service-co
 const inputHeroSmsMinPrice = document.getElementById('input-hero-sms-min-price');
 const inputHeroSmsMaxPrice = document.getElementById('input-hero-sms-max-price');
 const inputHeroSmsPreferredPrice = document.getElementById('input-hero-sms-preferred-price');
+const inputPhoneReuseMaxUses = document.getElementById('input-phone-reuse-max-uses');
 const inputPhoneReplacementLimit = document.getElementById('input-phone-replacement-limit');
 const inputPhoneCodeWaitSeconds = document.getElementById('input-phone-code-wait-seconds');
 const inputPhoneCodeTimeoutWindows = document.getElementById('input-phone-code-timeout-windows');
@@ -577,6 +598,9 @@ const PLUS_ACCOUNT_ACCESS_STRATEGY_SUB2API_CODEX_SESSION = 'sub2api_codex_sessio
 const PLUS_ACCOUNT_ACCESS_STRATEGY_CPA_CODEX_SESSION = 'cpa_codex_session';
 const PLUS_ACCOUNT_ACCESS_STRATEGY_CODEX_SESSION_UI = 'codex_session';
 const DEFAULT_PLUS_ACCOUNT_ACCESS_STRATEGY = PLUS_ACCOUNT_ACCESS_STRATEGY_OAUTH;
+const ACCOUNT_FLOW_MODE_SIGNUP = 'signup';
+const ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH = 'existing_account_reauth';
+const DEFAULT_ACCOUNT_FLOW_MODE = ACCOUNT_FLOW_MODE_SIGNUP;
 const SIGNUP_METHOD_EMAIL = 'email';
 const SIGNUP_METHOD_PHONE = 'phone';
 const DEFAULT_SIGNUP_METHOD = SIGNUP_METHOD_EMAIL;
@@ -587,6 +611,7 @@ let latestState = null;
 let currentPlusModeEnabled = false;
 let currentPlusPaymentMethod = DEFAULT_PLUS_PAYMENT_METHOD;
 let currentPlusAccountAccessStrategy = DEFAULT_PLUS_ACCOUNT_ACCESS_STRATEGY;
+let currentAccountFlowMode = DEFAULT_ACCOUNT_FLOW_MODE;
 let currentSignupMethod = DEFAULT_SIGNUP_METHOD;
 let currentPhoneVerificationEnabled = false;
 let currentPhoneSignupReloginAfterBindEmailEnabled = DEFAULT_PHONE_SIGNUP_RELOGIN_AFTER_BIND_EMAIL_ENABLED;
@@ -611,6 +636,7 @@ const nexSmsCountrySearchTextById = new Map();
 let stepDefinitions = getStepDefinitionsForMode(false, {
   plusPaymentMethod: currentPlusPaymentMethod,
   plusAccountAccessStrategy: currentPlusAccountAccessStrategy,
+  accountFlowMode: currentAccountFlowMode,
   signupMethod: currentSignupMethod,
   phoneVerificationEnabled: currentPhoneVerificationEnabled,
   phoneSignupReloginAfterBindEmailEnabled: currentPhoneSignupReloginAfterBindEmailEnabled,
@@ -618,6 +644,7 @@ let stepDefinitions = getStepDefinitionsForMode(false, {
 let workflowNodes = getWorkflowNodesForMode(false, {
   plusPaymentMethod: currentPlusPaymentMethod,
   plusAccountAccessStrategy: currentPlusAccountAccessStrategy,
+  accountFlowMode: currentAccountFlowMode,
   signupMethod: currentSignupMethod,
   phoneVerificationEnabled: currentPhoneVerificationEnabled,
   phoneSignupReloginAfterBindEmailEnabled: currentPhoneSignupReloginAfterBindEmailEnabled,
@@ -637,6 +664,9 @@ const AUTO_STEP_DELAY_MAX_SECONDS = 600;
 const VERIFICATION_RESEND_COUNT_MIN = 0;
 const VERIFICATION_RESEND_COUNT_MAX = 20;
 const DEFAULT_VERIFICATION_RESEND_COUNT = 4;
+const PHONE_REUSE_MAX_USES_MIN = 1;
+const PHONE_REUSE_MAX_USES_MAX = 20;
+const DEFAULT_PHONE_REUSE_MAX_USES = 3;
 const PHONE_REPLACEMENT_LIMIT_MIN = 1;
 const PHONE_REPLACEMENT_LIMIT_MAX = 20;
 const DEFAULT_PHONE_VERIFICATION_REPLACEMENT_LIMIT = 3;
@@ -877,6 +907,9 @@ function getStepDefinitionsForMode(plusModeEnabled = false, options = {}) {
   const defaultFlowId = typeof DEFAULT_ACTIVE_FLOW_ID !== 'undefined' ? DEFAULT_ACTIVE_FLOW_ID : 'openai';
   const defaultMethod = typeof DEFAULT_PLUS_PAYMENT_METHOD !== 'undefined' ? DEFAULT_PLUS_PAYMENT_METHOD : 'paypal';
   const defaultStrategy = typeof DEFAULT_PLUS_ACCOUNT_ACCESS_STRATEGY !== 'undefined' ? DEFAULT_PLUS_ACCOUNT_ACCESS_STRATEGY : 'oauth';
+  const rawAccountFlowMode = typeof options === 'string'
+    ? currentAccountFlowMode
+    : (options.accountFlowMode || currentAccountFlowMode || DEFAULT_ACCOUNT_FLOW_MODE);
   const rawPaymentMethod = typeof options === 'string'
     ? options
     : (options.plusPaymentMethod || currentPlusPaymentMethod || defaultMethod);
@@ -904,6 +937,7 @@ function getStepDefinitionsForMode(plusModeEnabled = false, options = {}) {
     : (options.activeFlowId || (typeof latestState !== 'undefined' ? latestState?.activeFlowId : '') || defaultFlowId);
   return (window.MultiPageStepDefinitions?.getSteps?.({
     activeFlowId: String(activeFlowId || '').trim().toLowerCase() || defaultFlowId,
+    accountFlowMode: normalizeAccountFlowMode(rawAccountFlowMode),
     plusModeEnabled,
     plusPaymentMethod: normalizePlusPaymentMethod(rawPaymentMethod),
     plusAccountAccessStrategy: normalizePlusAccountAccessStrategy(rawPlusAccountAccessStrategy),
@@ -924,6 +958,9 @@ function getWorkflowNodesForMode(plusModeEnabled = false, options = {}) {
   const defaultFlowId = typeof DEFAULT_ACTIVE_FLOW_ID !== 'undefined' ? DEFAULT_ACTIVE_FLOW_ID : 'openai';
   const defaultMethod = typeof DEFAULT_PLUS_PAYMENT_METHOD !== 'undefined' ? DEFAULT_PLUS_PAYMENT_METHOD : 'paypal';
   const defaultStrategy = typeof DEFAULT_PLUS_ACCOUNT_ACCESS_STRATEGY !== 'undefined' ? DEFAULT_PLUS_ACCOUNT_ACCESS_STRATEGY : 'oauth';
+  const rawAccountFlowMode = typeof options === 'string'
+    ? currentAccountFlowMode
+    : (options.accountFlowMode || currentAccountFlowMode || DEFAULT_ACCOUNT_FLOW_MODE);
   const rawPaymentMethod = typeof options === 'string'
     ? options
     : (options.plusPaymentMethod || currentPlusPaymentMethod || defaultMethod);
@@ -951,6 +988,7 @@ function getWorkflowNodesForMode(plusModeEnabled = false, options = {}) {
     : (options.activeFlowId || (typeof latestState !== 'undefined' ? latestState?.activeFlowId : '') || defaultFlowId);
   const nodes = window.MultiPageStepDefinitions?.getNodes?.({
     activeFlowId: String(activeFlowId || '').trim().toLowerCase() || defaultFlowId,
+    accountFlowMode: normalizeAccountFlowMode(rawAccountFlowMode),
     plusModeEnabled,
     plusPaymentMethod: normalizePlusPaymentMethod(rawPaymentMethod),
     plusAccountAccessStrategy: normalizePlusAccountAccessStrategy(rawPlusAccountAccessStrategy),
@@ -1013,6 +1051,9 @@ function rebuildStepDefinitionState(plusModeEnabled = false, options = {}) {
   const defaultFlowId = typeof DEFAULT_ACTIVE_FLOW_ID !== 'undefined' ? DEFAULT_ACTIVE_FLOW_ID : 'openai';
   const defaultMethod = typeof DEFAULT_PLUS_PAYMENT_METHOD !== 'undefined' ? DEFAULT_PLUS_PAYMENT_METHOD : 'paypal';
   const defaultStrategy = typeof DEFAULT_PLUS_ACCOUNT_ACCESS_STRATEGY !== 'undefined' ? DEFAULT_PLUS_ACCOUNT_ACCESS_STRATEGY : 'oauth';
+  const rawAccountFlowMode = typeof options === 'string'
+    ? currentAccountFlowMode
+    : (options.accountFlowMode || currentAccountFlowMode || DEFAULT_ACCOUNT_FLOW_MODE);
   const rawPaymentMethod = typeof options === 'string'
     ? options
     : (options.plusPaymentMethod || currentPlusPaymentMethod || defaultMethod);
@@ -1038,6 +1079,7 @@ function rebuildStepDefinitionState(plusModeEnabled = false, options = {}) {
   );
   currentPlusPaymentMethod = normalizePlusPaymentMethod(rawPaymentMethod);
   currentPlusAccountAccessStrategy = normalizePlusAccountAccessStrategy(rawPlusAccountAccessStrategy);
+  currentAccountFlowMode = normalizeAccountFlowMode(rawAccountFlowMode);
   currentSignupMethod = normalizeSignupMethod(rawSignupMethod);
   currentPhoneVerificationEnabled = Boolean(phoneVerificationEnabled);
   currentPhoneSignupReloginAfterBindEmailEnabled = phoneSignupReloginAfterBindEmailEnabled;
@@ -1051,6 +1093,7 @@ function rebuildStepDefinitionState(plusModeEnabled = false, options = {}) {
   }
   stepDefinitions = getStepDefinitionsForMode(currentPlusModeEnabled, {
     activeFlowId: nextActiveFlowId,
+    accountFlowMode: currentAccountFlowMode,
     plusPaymentMethod: currentPlusPaymentMethod,
     plusAccountAccessStrategy: currentPlusAccountAccessStrategy,
     signupMethod: currentSignupMethod,
@@ -1061,6 +1104,7 @@ function rebuildStepDefinitionState(plusModeEnabled = false, options = {}) {
   const nextWorkflowNodes = typeof getWorkflowNodesForMode === 'function'
     ? getWorkflowNodesForMode(currentPlusModeEnabled, {
       activeFlowId: nextActiveFlowId,
+      accountFlowMode: currentAccountFlowMode,
       plusPaymentMethod: currentPlusPaymentMethod,
       plusAccountAccessStrategy: currentPlusAccountAccessStrategy,
       signupMethod: currentSignupMethod,
@@ -3158,6 +3202,7 @@ function syncLatestState(nextState) {
     : selectedTargetId;
 
   renderAccountRecords(latestState);
+  updateExistingAccountPoolSummary();
 }
 
 function isContributionModeActiveForFlow(state = latestState, flowId = undefined) {
@@ -3799,6 +3844,856 @@ function normalizeCustomEmailPoolEntries(value = '') {
     .filter((item) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item));
 }
 
+function normalizeExistingAccountPoolEmail(value = '') {
+  return String(value || '').trim().toLowerCase();
+}
+
+function createExistingAccountPoolEntryId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `existing-account-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function parseExistingAccountPoolLine(value = '') {
+  const rawLine = String(value || '').trim();
+  if (!rawLine) {
+    return null;
+  }
+
+  const delimiterMatch = rawLine.match(/^(.*?)\s*(----|\t|,|，|;|；|\|)\s*(.*)$/);
+  const rawEmail = delimiterMatch ? delimiterMatch[1] : rawLine;
+  const rawPassword = delimiterMatch ? delimiterMatch[3] : '';
+  const email = normalizeExistingAccountPoolEmail(rawEmail);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return null;
+  }
+
+  return {
+    email,
+    password: String(rawPassword || ''),
+  };
+}
+
+function normalizeExistingAccountPoolEntryObjects(value = []) {
+  const source = Array.isArray(value)
+    ? value
+    : String(value || '').split(/[\r\n]+/);
+  const seenEmails = new Set();
+  const entries = [];
+
+  for (const rawEntry of source) {
+    const parsedEntry = rawEntry && typeof rawEntry === 'object'
+      ? {
+        id: String(rawEntry.id || createExistingAccountPoolEntryId()),
+        email: normalizeExistingAccountPoolEmail(rawEntry.email || ''),
+        password: String(rawEntry.password || ''),
+      }
+      : (() => {
+        const parsedLine = parseExistingAccountPoolLine(rawEntry);
+        if (!parsedLine) {
+          return null;
+        }
+        return {
+          id: createExistingAccountPoolEntryId(),
+          email: parsedLine.email,
+          password: parsedLine.password,
+        };
+      })();
+    if (!parsedEntry?.email) {
+      continue;
+    }
+    if (seenEmails.has(parsedEntry.email)) {
+      continue;
+    }
+    seenEmails.add(parsedEntry.email);
+    entries.push(parsedEntry);
+  }
+
+  return entries;
+}
+
+function formatExistingAccountPoolEntriesForTextarea(value = []) {
+  return normalizeExistingAccountPoolEntryObjects(value)
+    .map((entry) => (entry.password ? `${entry.email}----${entry.password}` : entry.email))
+    .join('\n');
+}
+
+function getExistingAccountPoolEntriesFromInput() {
+  return normalizeExistingAccountPoolEntryObjects(inputExistingAccountPool?.value || '');
+}
+
+function getPersistedExistingAccountPoolEntries(state = latestState) {
+  return normalizeExistingAccountPoolEntryObjects(state?.existingAccountPoolEntries || []);
+}
+
+function getExistingAccountPoolSize() {
+  return getPersistedExistingAccountPoolEntries().length;
+}
+
+function setExistingAccountPoolDraftInputValue(value = []) {
+  const normalizedEntries = normalizeExistingAccountPoolEntryObjects(value);
+  if (inputExistingAccountPool) {
+    inputExistingAccountPool.value = formatExistingAccountPoolEntriesForTextarea(normalizedEntries);
+  }
+  updateExistingAccountPoolSummary();
+  return normalizedEntries;
+}
+
+function pruneExistingAccountPoolSelection(entries = getPersistedExistingAccountPoolEntries()) {
+  const existingIds = new Set(entries.map((entry) => String(entry.id || '')).filter(Boolean));
+  existingAccountPoolSelectedIds = new Set(
+    [...existingAccountPoolSelectedIds].filter((id) => existingIds.has(id))
+  );
+}
+
+function updateExistingAccountPoolBulkUi(visibleEntries = getFilteredExistingAccountPoolPreviewEntries(latestState)) {
+  const entries = getPersistedExistingAccountPoolEntries();
+  pruneExistingAccountPoolSelection(entries);
+  const visibleIds = visibleEntries.map((entry) => String(entry.id || '')).filter(Boolean);
+  const selectedVisibleCount = visibleIds.filter((id) => existingAccountPoolSelectedIds.has(id)).length;
+  const hasVisible = visibleIds.length > 0;
+  const hasSelection = existingAccountPoolSelectedIds.size > 0;
+
+  if (checkboxExistingAccountPoolSelectAll) {
+    checkboxExistingAccountPoolSelectAll.checked = hasVisible && selectedVisibleCount === visibleIds.length;
+    checkboxExistingAccountPoolSelectAll.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < visibleIds.length;
+    checkboxExistingAccountPoolSelectAll.disabled = !hasVisible;
+  }
+  if (existingAccountPoolSelectionSummary) {
+    existingAccountPoolSelectionSummary.textContent = `已选 ${existingAccountPoolSelectedIds.size} 个（当前显示 ${visibleIds.length} 个）`;
+  }
+  if (btnExistingAccountPoolBulkDelete) {
+    btnExistingAccountPoolBulkDelete.disabled = !hasSelection;
+  }
+  if (inputExistingAccountPoolSearch) {
+    inputExistingAccountPoolSearch.disabled = entries.length === 0;
+  }
+  if (selectExistingAccountPoolFilter) {
+    selectExistingAccountPoolFilter.disabled = entries.length === 0;
+  }
+  if (btnExistingAccountPoolDeleteAll) {
+    btnExistingAccountPoolDeleteAll.disabled = entries.length === 0;
+  }
+}
+
+function updateExistingAccountPoolDraftUi() {
+  const draftEntries = getExistingAccountPoolEntriesFromInput();
+  if (btnExistingAccountPoolApply) {
+    btnExistingAccountPoolApply.disabled = draftEntries.length === 0;
+  }
+}
+
+async function saveExistingAccountPoolEntries(value = [], options = {}) {
+  const normalizedEntries = normalizeExistingAccountPoolEntryObjects(value);
+  const previousEntries = getPersistedExistingAccountPoolEntries();
+  syncLatestState({
+    existingAccountPoolEntries: normalizedEntries,
+  });
+  updateExistingAccountPoolSummary();
+  syncRunCountFromConfiguredEmailPool();
+  markSettingsDirty(true);
+  try {
+    await saveSettings({
+      silent: options.silent !== undefined ? Boolean(options.silent) : true,
+      force: options.force !== undefined ? Boolean(options.force) : true,
+    });
+    if (options.clearDraft) {
+      setExistingAccountPoolDraftInputValue([]);
+    }
+    return normalizedEntries;
+  } catch (error) {
+    syncLatestState({
+      existingAccountPoolEntries: previousEntries,
+    });
+    updateExistingAccountPoolSummary();
+    syncRunCountFromConfiguredEmailPool();
+    throw error;
+  }
+}
+
+function normalizeExistingAccountPoolEmailDomain(value = '') {
+  const candidate = String(value || '').trim().toLowerCase();
+  if (!candidate) {
+    return '';
+  }
+  const atIndex = candidate.lastIndexOf('@');
+  const domain = atIndex >= 0 ? candidate.slice(atIndex + 1) : candidate;
+  return domain.replace(/^\.+|\.+$/g, '');
+}
+
+function normalizeExistingAccountPoolDomainSet(...values) {
+  const domains = new Set();
+  for (const value of values) {
+    const items = Array.isArray(value) ? value : [value];
+    for (const item of items) {
+      const normalized = normalizeExistingAccountPoolEmailDomain(item);
+      if (normalized) {
+        domains.add(normalized);
+      }
+    }
+  }
+  return domains;
+}
+
+function getExistingAccountPoolMailboxProviderLabel(provider = '') {
+  switch (String(provider || '').trim().toLowerCase()) {
+    case 'hotmail-api':
+      return 'Hotmail';
+    case 'icloud':
+      return 'iCloud 邮箱';
+    case 'gmail':
+      return 'Gmail 邮箱';
+    case 'yahoo':
+      return 'Yahoo 邮箱';
+    case 'qq':
+      return 'QQ 邮箱';
+    case '163':
+      return '163 邮箱';
+    case '163-vip':
+      return '163 VIP 邮箱';
+    case '126':
+      return '126 邮箱';
+    case '2925':
+      return '2925 邮箱';
+    case 'cloudflare-temp-email':
+      return 'Cloudflare Temp Email';
+    case 'cloudmail':
+      return 'Cloud Mail';
+    case 'luckmail-api':
+      return 'LuckMail';
+    case 'yyds-mail':
+      return 'YYDS Mail';
+    case 'inbucket':
+      return 'Inbucket';
+    case 'custom':
+      return '自定义邮箱';
+    default:
+      return 'QQ 邮箱';
+  }
+}
+
+function resolveExistingAccountPoolMailboxProvider(email = '', state = latestState) {
+  const domain = normalizeExistingAccountPoolEmailDomain(email);
+  const configuredFallbackProvider = String(
+    state?.mailProvider
+    || ((typeof selectMailProvider !== 'undefined' && selectMailProvider) ? selectMailProvider.value : '')
+    || 'qq'
+  ).trim().toLowerCase() || 'qq';
+  if (!domain) {
+    return {
+      provider: configuredFallbackProvider,
+      label: getExistingAccountPoolMailboxProviderLabel(configuredFallbackProvider),
+      detected: false,
+      domain: '',
+      fallback: true,
+    };
+  }
+
+  let detectedProvider = '';
+  if ([
+    'hotmail.com',
+    'outlook.com',
+    'live.com',
+    'msn.com',
+    'passport.com',
+    'passport.cn',
+    'outlook.jp',
+    'outlook.co.jp',
+    'hotmail.co.uk',
+    'live.cn',
+    'live.com.cn',
+    'windowslive.com',
+  ].includes(domain)) {
+    detectedProvider = 'hotmail-api';
+  } else if (['icloud.com', 'me.com', 'mac.com', 'privaterelay.appleid.com'].includes(domain)) {
+    detectedProvider = 'icloud';
+  } else if (['gmail.com', 'googlemail.com'].includes(domain)) {
+    detectedProvider = 'gmail';
+  } else if (['yahoo.com', 'yahoo.com.cn', 'yahoo.co.jp', 'ymail.com', 'rocketmail.com'].includes(domain)) {
+    detectedProvider = 'yahoo';
+  } else if (domain === '2925.com') {
+    detectedProvider = '2925';
+  } else if (domain === 'qq.com') {
+    detectedProvider = 'qq';
+  } else if (domain === '163.com') {
+    detectedProvider = '163';
+  } else if (['vip.163.com', '188.com'].includes(domain)) {
+    detectedProvider = '163-vip';
+  } else if (domain === '126.com') {
+    detectedProvider = '126';
+  } else {
+    const cloudflareTempEmailDomains = normalizeExistingAccountPoolDomainSet(
+      state?.cloudflareTempEmailDomain,
+      state?.cloudflareTempEmailDomains
+    );
+    if (cloudflareTempEmailDomains.has(domain)) {
+      detectedProvider = 'cloudflare-temp-email';
+    } else {
+      const cloudMailDomains = normalizeExistingAccountPoolDomainSet(
+        state?.cloudMailDomain,
+        state?.cloudMailDomains
+      );
+      if (cloudMailDomains.has(domain)) {
+        detectedProvider = 'cloudmail';
+      }
+    }
+  }
+
+  const provider = detectedProvider || configuredFallbackProvider;
+  return {
+    provider,
+    label: getExistingAccountPoolMailboxProviderLabel(provider),
+    detected: Boolean(detectedProvider),
+    domain,
+    fallback: !detectedProvider,
+  };
+}
+
+let existingAccountPoolSearchTerm = '';
+let existingAccountPoolFilterMode = 'all';
+let existingAccountPoolSelectedIds = new Set();
+
+function normalizeExistingAccountPoolSearchText(value = '') {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizeExistingAccountPoolHistoryRecordEmail(record = {}) {
+  const directEmail = normalizeExistingAccountPoolEmail(record?.email || '');
+  if (directEmail) {
+    return directEmail;
+  }
+  const identifierType = String(record?.accountIdentifierType || '').trim().toLowerCase();
+  if (identifierType === 'phone') {
+    return '';
+  }
+  return normalizeExistingAccountPoolEmail(record?.accountIdentifier || '');
+}
+
+function normalizeExistingAccountPoolHistoryTimestamp(...values) {
+  for (const value of values) {
+    const timestamp = Date.parse(String(value || ''));
+    if (Number.isFinite(timestamp)) {
+      return timestamp;
+    }
+  }
+  return 0;
+}
+
+function normalizeExistingAccountPoolRecordStatus(record = {}) {
+  return String(record?.displayStatus || record?.finalStatus || '').trim().toLowerCase();
+}
+
+function getExistingAccountPoolRecordPhoneNumber(record = {}) {
+  const directPhoneNumber = String(record?.phoneNumber || record?.phone || record?.number || '').trim();
+  if (directPhoneNumber) {
+    return directPhoneNumber;
+  }
+  const identifierType = String(record?.accountIdentifierType || '').trim().toLowerCase();
+  return identifierType === 'phone'
+    ? String(record?.accountIdentifier || '').trim()
+    : '';
+}
+
+function isExistingAccountPoolRecordPhoneVerified(record = {}) {
+  return record?.phoneVerificationSucceeded === true
+    || Math.max(0, Number(record?.phoneVerificationSucceededAt) || 0) > 0;
+}
+
+function isExistingAccountPoolRecordPhoneCodeReceived(record = {}) {
+  const phoneNumber = getExistingAccountPoolRecordPhoneNumber(record);
+  if (!phoneNumber) {
+    return false;
+  }
+  return record?.phoneCodeReceived === true
+    || Math.max(0, Number(record?.phoneCodeReceivedAt) || 0) > 0
+    || isExistingAccountPoolRecordPhoneVerified(record);
+}
+
+function getExistingAccountPoolRecordPhoneState(record = {}) {
+  const phoneNumber = getExistingAccountPoolRecordPhoneNumber(record);
+  if (!phoneNumber) {
+    return 'unverified';
+  }
+  if (isExistingAccountPoolRecordPhoneVerified(record)) {
+    return 'verified';
+  }
+  if (isExistingAccountPoolRecordPhoneCodeReceived(record)) {
+    return 'received';
+  }
+  return 'unverified';
+}
+
+function isExistingAccountPoolAutoRunDisplayRunning(state = latestState) {
+  const phase = String(state?.autoRunPhase || '').trim().toLowerCase();
+  return Boolean(state?.autoRunning)
+    && ['running', 'waiting_step', 'waiting_email', 'retrying'].includes(phase);
+}
+
+function resolveExistingAccountPoolCurrentEmail(state = latestState) {
+  const identifierType = String(state?.accountIdentifierType || '').trim().toLowerCase();
+  const candidates = [
+    state?.email,
+    identifierType === 'email' ? state?.accountIdentifier : '',
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizeExistingAccountPoolEmail(candidate || '');
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return '';
+}
+
+function getExistingAccountPoolLatestHistoryRecordMap(state = latestState) {
+  const records = Array.isArray(state?.accountRunHistory) ? state.accountRunHistory : [];
+  return records
+    .filter((item) => item && typeof item === 'object')
+    .slice()
+    .sort((left, right) => (
+      normalizeExistingAccountPoolHistoryTimestamp(
+        right?.finishedAt,
+        right?.updatedAt,
+        right?.createdAt,
+        right?.startedAt
+      ) - normalizeExistingAccountPoolHistoryTimestamp(
+        left?.finishedAt,
+        left?.updatedAt,
+        left?.createdAt,
+        left?.startedAt
+      )
+    ))
+    .reduce((lookup, record) => {
+      const email = normalizeExistingAccountPoolHistoryRecordEmail(record);
+      if (!email || lookup.has(email)) {
+        return lookup;
+      }
+      lookup.set(email, record);
+      return lookup;
+    }, new Map());
+}
+
+function formatExistingAccountPoolRecordTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const now = new Date();
+  const sameYear = date.getFullYear() === now.getFullYear();
+  const sameDay = date.toDateString() === now.toDateString();
+  const displayTimeZone = typeof DISPLAY_TIMEZONE === 'string' ? DISPLAY_TIMEZONE : 'Asia/Shanghai';
+
+  if (sameDay) {
+    return date.toLocaleTimeString('zh-CN', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: displayTimeZone,
+    });
+  }
+
+  return date.toLocaleString('zh-CN', {
+    hour12: false,
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(sameYear ? {} : { year: '2-digit' }),
+    timeZone: displayTimeZone,
+  }).replace(/\//g, '-');
+}
+
+function getExistingAccountPoolStatusMeta(record = null, state = latestState, email = '') {
+  const normalizedEmail = normalizeExistingAccountPoolEmail(email || '');
+  const recordStatus = normalizeExistingAccountPoolRecordStatus(record || {});
+  const currentEmail = resolveExistingAccountPoolCurrentEmail(state);
+  if (
+    normalizedEmail
+    && currentEmail === normalizedEmail
+    && isExistingAccountPoolAutoRunDisplayRunning(state)
+    && recordStatus !== 'success'
+  ) {
+    return { kind: 'running', label: '运行中' };
+  }
+  if (recordStatus === 'success') {
+    return { kind: 'success', label: '成功' };
+  }
+  if (recordStatus === 'running') {
+    return { kind: 'running', label: '运行中' };
+  }
+  if (recordStatus === 'stopped') {
+    return { kind: 'stopped', label: '停止' };
+  }
+  if (recordStatus) {
+    return { kind: 'failed', label: '失败' };
+  }
+  return { kind: 'unknown', label: '未运行' };
+}
+
+function getExistingAccountPoolStatusSummary(record = null, statusMeta = { kind: 'unknown' }) {
+  const displaySummary = String(record?.displaySummary || '').trim();
+  if (statusMeta.kind === 'running') {
+    return displaySummary || '正在运行';
+  }
+  if (displaySummary) {
+    return displaySummary;
+  }
+  if (statusMeta.kind === 'success') {
+    return '流程完成';
+  }
+  if (statusMeta.kind === 'stopped') {
+    return String(record?.failureDetail || record?.reason || record?.failureLabel || '').trim() || '流程已停止';
+  }
+  if (statusMeta.kind === 'failed') {
+    return String(record?.failureDetail || record?.reason || record?.failureLabel || '').trim() || '流程失败';
+  }
+  return '暂无运行记录';
+}
+
+function buildExistingAccountPoolPreviewEntries(state = latestState) {
+  const historyRecordMap = getExistingAccountPoolLatestHistoryRecordMap(state);
+  const currentEmail = resolveExistingAccountPoolCurrentEmail(state);
+
+  return getPersistedExistingAccountPoolEntries(state).map((entry, index) => {
+    const providerMeta = resolveExistingAccountPoolMailboxProvider(entry.email, state);
+    const historyRecord = historyRecordMap.get(entry.email) || null;
+    const statusMeta = getExistingAccountPoolStatusMeta(historyRecord, state, entry.email);
+    const rawPhoneNumber = getExistingAccountPoolRecordPhoneNumber(historyRecord || {});
+    const hasHistory = Boolean(historyRecord);
+    const phoneState = hasHistory
+      ? getExistingAccountPoolRecordPhoneState(historyRecord || {})
+      : 'pending';
+    const tierState = hasHistory
+      ? (Boolean(historyRecord?.plusModeEnabled) ? 'plus' : 'free')
+      : 'pending';
+    const providerNote = providerMeta.detected
+      ? `按邮箱后缀 ${providerMeta.domain} 自动识别收码服务`
+      : (providerMeta.domain
+        ? `当前未识别邮箱后缀 ${providerMeta.domain}，执行时会沿用已保存邮箱服务：${providerMeta.label}`
+        : `当前未识别邮箱后缀，执行时会沿用已保存邮箱服务：${providerMeta.label}`);
+    const recordedAtLabel = formatExistingAccountPoolRecordTime(
+      historyRecord?.finishedAt
+      || historyRecord?.updatedAt
+      || historyRecord?.createdAt
+      || historyRecord?.startedAt
+    );
+    const statusSummary = getExistingAccountPoolStatusSummary(historyRecord, statusMeta);
+    const historyNote = recordedAtLabel
+      ? `最近状态：${statusMeta.label} · ${statusSummary} · ${recordedAtLabel}`
+      : `最近状态：${statusMeta.label} · ${statusSummary}`;
+    return {
+      id: String(entry.id || ''),
+      index: index + 1,
+      email: entry.email,
+      password: String(entry.password || ''),
+      hasHistory,
+      hasPassword: String(entry.password || '') !== '',
+      current: currentEmail === entry.email,
+      loginModeLabel: String(entry.password || '') !== '' ? '密码登录' : '验证码登录',
+      providerLabel: providerMeta.label,
+      providerDetected: providerMeta.detected,
+      providerFallback: providerMeta.fallback,
+      providerDomain: providerMeta.domain,
+      note: providerNote,
+      statusKind: statusMeta.kind,
+      statusLabel: statusMeta.label,
+      statusSummary,
+      historyNote,
+      tierState,
+      tierLabel: tierState === 'plus' ? 'Plus' : (tierState === 'free' ? 'Free' : '未判定'),
+      phoneState,
+      phoneLabel: phoneState === 'verified'
+        ? '验证成功'
+        : (phoneState === 'received' ? '已接码未成功' : (phoneState === 'unverified' ? '未接码' : '待运行')),
+      phoneNumber: (phoneState === 'verified' || phoneState === 'received') ? rawPhoneNumber : '',
+    };
+  });
+}
+
+function getFilteredExistingAccountPoolPreviewEntries(state = latestState) {
+  const entries = buildExistingAccountPoolPreviewEntries(state);
+  const normalizedSearchTerm = normalizeExistingAccountPoolSearchText(
+    inputExistingAccountPoolSearch?.value || existingAccountPoolSearchTerm
+  );
+  const filterMode = String(
+    selectExistingAccountPoolFilter?.value
+    || existingAccountPoolFilterMode
+    || 'all'
+  ).trim().toLowerCase() || 'all';
+
+  return entries.filter((entry) => {
+    const matchesFilter = (() => {
+      switch (filterMode) {
+        case 'current':
+          return Boolean(entry.current);
+        case 'password':
+          return Boolean(entry.hasPassword);
+        case 'otp':
+          return !entry.hasPassword;
+        case 'plus':
+          return entry.tierState === 'plus';
+        case 'free':
+          return entry.tierState === 'free';
+        case 'verified':
+          return entry.phoneState === 'verified';
+        case 'received':
+          return entry.phoneState === 'received';
+        case 'unverified':
+          return entry.phoneState === 'unverified';
+        case 'pending':
+          return entry.statusKind === 'unknown';
+        default:
+          return true;
+      }
+    })();
+
+    if (!matchesFilter) {
+      return false;
+    }
+
+    if (!normalizedSearchTerm) {
+      return true;
+    }
+
+    return [
+      entry.email,
+      entry.loginModeLabel,
+      entry.providerLabel,
+      entry.providerDomain,
+      entry.note,
+      entry.statusLabel,
+      entry.statusSummary,
+      entry.historyNote,
+      entry.tierLabel,
+      entry.phoneLabel,
+      entry.phoneNumber,
+      entry.current ? 'current 当前 当前账号' : '',
+    ].join(' ').toLowerCase().includes(normalizedSearchTerm);
+  });
+}
+
+function renderExistingAccountPoolPreview(state = latestState) {
+  if (!existingAccountPoolPreview) {
+    return [];
+  }
+
+  const entries = buildExistingAccountPoolPreviewEntries(state);
+  pruneExistingAccountPoolSelection(entries);
+  const visibleEntries = getFilteredExistingAccountPoolPreviewEntries(state);
+  existingAccountPoolPreview.replaceChildren();
+  if (!entries.length) {
+    existingAccountPoolPreview.hidden = false;
+    existingAccountPoolPreview.innerHTML = '<div class="luckmail-empty">还没有重新授权账号，先在上方粘贴草稿，再点“确认导入”加入账号池。</div>';
+    updateExistingAccountPoolBulkUi([]);
+    return entries;
+  }
+
+  if (!visibleEntries.length) {
+    existingAccountPoolPreview.hidden = false;
+    existingAccountPoolPreview.innerHTML = '<div class="luckmail-empty">没有匹配当前筛选条件的账号。</div>';
+    updateExistingAccountPoolBulkUi([]);
+    return entries;
+  }
+
+  const fragment = document.createDocumentFragment();
+  visibleEntries.forEach((entry) => {
+    const item = document.createElement('div');
+    item.className = `existing-account-pool-item${entry.current ? ' is-current' : ''}`;
+
+    const head = document.createElement('div');
+    head.className = 'existing-account-pool-item-head';
+
+    const selector = document.createElement('input');
+    selector.className = 'luckmail-item-check';
+    selector.type = 'checkbox';
+    selector.checked = existingAccountPoolSelectedIds.has(String(entry.id || ''));
+    selector.addEventListener('change', () => {
+      const entryId = String(entry.id || '');
+      if (selector.checked) {
+        existingAccountPoolSelectedIds.add(entryId);
+      } else {
+        existingAccountPoolSelectedIds.delete(entryId);
+      }
+      updateExistingAccountPoolBulkUi(visibleEntries);
+    });
+    head.appendChild(selector);
+
+    const index = document.createElement('span');
+    index.className = 'existing-account-pool-index mono';
+    index.textContent = `#${entry.index}`;
+    head.appendChild(index);
+
+    const main = document.createElement('div');
+    main.className = 'existing-account-pool-item-main';
+
+    const emailRow = document.createElement('div');
+    emailRow.className = 'existing-account-pool-email-row';
+
+    const email = document.createElement('div');
+    email.className = 'existing-account-pool-email mono';
+    email.textContent = entry.email;
+    emailRow.appendChild(email);
+
+    const actions = document.createElement('div');
+    actions.className = 'existing-account-pool-actions';
+
+    const copyButton = document.createElement('button');
+    copyButton.className = 'hotmail-copy-btn';
+    copyButton.type = 'button';
+    copyButton.title = '复制邮箱';
+    copyButton.setAttribute('aria-label', `复制邮箱 ${entry.email}`);
+    copyButton.innerHTML = typeof COPY_ICON === 'string' ? COPY_ICON : '复制';
+    copyButton.addEventListener('click', async () => {
+      await copyTextToClipboard(entry.email || '');
+      showToast('邮箱已复制', 'success', 1600);
+    });
+    actions.appendChild(copyButton);
+
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'btn btn-outline btn-xs';
+    deleteButton.type = 'button';
+    deleteButton.textContent = '删除';
+    deleteButton.addEventListener('click', async () => {
+      try {
+        const nextEntries = getPersistedExistingAccountPoolEntries()
+          .filter((candidate) => normalizeExistingAccountPoolEmail(candidate?.email || '') !== entry.email);
+        await saveExistingAccountPoolEntries(nextEntries, { silent: true, force: true });
+        showToast(`已删除账号 ${entry.email}`, 'success', 1800);
+      } catch (error) {
+        showToast(`删除账号失败：${error.message}`, 'error');
+      }
+    });
+    actions.appendChild(deleteButton);
+
+    emailRow.appendChild(actions);
+    main.appendChild(emailRow);
+
+    const meta = document.createElement('div');
+    meta.className = 'existing-account-pool-meta';
+
+    if (entry.current) {
+      const currentTag = document.createElement('span');
+      currentTag.className = 'existing-account-pool-tag is-current';
+      currentTag.textContent = '当前';
+      meta.appendChild(currentTag);
+    }
+
+    const loginTag = document.createElement('span');
+    loginTag.className = 'existing-account-pool-tag';
+    loginTag.textContent = entry.loginModeLabel;
+    meta.appendChild(loginTag);
+
+    const providerTag = document.createElement('span');
+    providerTag.className = `existing-account-pool-tag ${entry.providerDetected ? 'is-detected' : 'is-fallback'}`.trim();
+    providerTag.textContent = entry.providerLabel;
+    meta.appendChild(providerTag);
+
+    if (entry.providerFallback) {
+      const fallbackTag = document.createElement('span');
+      fallbackTag.className = 'existing-account-pool-tag is-fallback';
+      fallbackTag.textContent = '后缀未识别';
+      meta.appendChild(fallbackTag);
+    }
+
+    const tierTag = document.createElement('span');
+    tierTag.className = `existing-account-pool-tag ${entry.tierState === 'plus' ? 'is-plus' : (entry.tierState === 'free' ? 'is-free' : 'is-pending')}`.trim();
+    tierTag.textContent = entry.tierLabel;
+    meta.appendChild(tierTag);
+
+    const phoneTag = document.createElement('span');
+    phoneTag.className = `existing-account-pool-tag ${
+      entry.phoneState === 'verified'
+        ? 'is-verified'
+        : (entry.phoneState === 'received' ? 'is-received' : (entry.phoneState === 'unverified' ? 'is-unverified' : 'is-pending'))
+    }`.trim();
+    phoneTag.textContent = entry.phoneLabel;
+    meta.appendChild(phoneTag);
+
+    const statusTag = document.createElement('span');
+    statusTag.className = `existing-account-pool-tag is-status-${entry.statusKind}`.trim();
+    statusTag.textContent = entry.statusLabel;
+    meta.appendChild(statusTag);
+
+    main.appendChild(meta);
+
+    const note = document.createElement('div');
+    note.className = 'existing-account-pool-note';
+    note.textContent = entry.note;
+    main.appendChild(note);
+
+    const historyNote = document.createElement('div');
+    historyNote.className = 'existing-account-pool-note';
+    historyNote.textContent = entry.historyNote;
+    main.appendChild(historyNote);
+
+    if (entry.phoneNumber) {
+      const phoneLine = document.createElement('div');
+      phoneLine.className = 'existing-account-pool-note is-muted mono';
+      phoneLine.textContent = `接码手机号：${entry.phoneNumber}`;
+      main.appendChild(phoneLine);
+    }
+
+    head.appendChild(main);
+    item.appendChild(head);
+
+    fragment.appendChild(item);
+  });
+
+  existingAccountPoolPreview.appendChild(fragment);
+  existingAccountPoolPreview.hidden = false;
+  updateExistingAccountPoolBulkUi(visibleEntries);
+  return entries;
+}
+
+function updateExistingAccountPoolSummary() {
+  if (!existingAccountPoolSummary) {
+    return;
+  }
+
+  const existingAccountReauthMode = typeof isExistingAccountReauthMode === 'function'
+    ? isExistingAccountReauthMode(latestState)
+    : false;
+  const autoDetectSuffixHint = existingAccountReauthMode
+    ? ' 收码邮箱服务会按邮箱后缀自动识别。'
+    : '';
+  const entries = buildExistingAccountPoolPreviewEntries(latestState);
+  const draftEntries = getExistingAccountPoolEntriesFromInput();
+  const draftSummaryText = draftEntries.length > 0
+    ? ` 当前草稿 ${draftEntries.length} 个，点击“确认导入”后才会加入账号池。`
+    : ' 输入框内容仅作为导入草稿，不会自动加入账号池。';
+  if (!entries.length) {
+    existingAccountPoolSummary.textContent = `每行一个账号。密码留空时会自动走一次性验证码登录。${draftSummaryText}${autoDetectSuffixHint}`.trim();
+    updateExistingAccountPoolDraftUi();
+    renderExistingAccountPoolPreview(latestState);
+    return;
+  }
+
+  const passwordCount = entries.filter((entry) => String(entry.password || '') !== '').length;
+  const otpCount = Math.max(0, entries.length - passwordCount);
+  const recordedCount = entries.filter((entry) => entry.hasHistory).length;
+  const plusCount = entries.filter((entry) => entry.tierState === 'plus').length;
+  const freeCount = entries.filter((entry) => entry.tierState === 'free').length;
+  const verifiedCount = entries.filter((entry) => entry.phoneState === 'verified').length;
+  const receivedCount = entries.filter((entry) => entry.phoneState === 'received').length;
+  const unverifiedCount = entries.filter((entry) => entry.phoneState === 'unverified').length;
+  const recordSummaryText = recordedCount > 0
+    ? ` 已有 ${recordedCount} 个账号记录，其中 ${plusCount} 个 Plus、${freeCount} 个 Free，${verifiedCount} 个验证成功${receivedCount > 0 ? `、${receivedCount} 个已接码未成功` : ''}${unverifiedCount > 0 ? `、${unverifiedCount} 个未接码` : ''}。`
+    : ' 还没有账号运行记录。';
+  existingAccountPoolSummary.textContent = `已配置 ${entries.length} 个账号，其中 ${passwordCount} 个密码登录，${otpCount} 个验证码登录。${recordSummaryText}自动模式会按当前顺序逐个授权。${draftSummaryText}${autoDetectSuffixHint}`.trim();
+  if (inputExistingAccountPoolSearch) {
+    inputExistingAccountPoolSearch.disabled = entries.length === 0;
+  }
+  if (selectExistingAccountPoolFilter) {
+    selectExistingAccountPoolFilter.disabled = entries.length === 0;
+  }
+  if (btnExistingAccountPoolDeleteAll) {
+    btnExistingAccountPoolDeleteAll.disabled = entries.length === 0;
+  }
+  updateExistingAccountPoolDraftUi();
+  renderExistingAccountPoolPreview(latestState);
+}
+
 function normalizeCustomEmailPoolEntryEmail(value = '') {
   return String(value || '').trim().toLowerCase();
 }
@@ -3907,6 +4802,12 @@ function getCustomEmailPoolSize() {
 }
 
 function getLockedRunCountFromEmailPool(provider = selectMailProvider.value) {
+  if (typeof isExistingAccountReauthMode === 'function' && isExistingAccountReauthMode()) {
+    const existingAccountPoolSize = getExistingAccountPoolSize();
+    if (existingAccountPoolSize > 0) {
+      return existingAccountPoolSize;
+    }
+  }
   if (usesCustomMailProviderPool(provider)) {
     return getCustomMailProviderPoolSize();
   }
@@ -3935,6 +4836,13 @@ function syncRunCountFromCustomMailProviderPool() {
 }
 
 function syncRunCountFromConfiguredEmailPool(provider = selectMailProvider.value) {
+  if (typeof isExistingAccountReauthMode === 'function' && isExistingAccountReauthMode()) {
+    const existingAccountPoolSize = getExistingAccountPoolSize();
+    if (existingAccountPoolSize > 0) {
+      inputRunCount.value = String(existingAccountPoolSize);
+      return;
+    }
+  }
   const poolSize = getLockedRunCountFromEmailPool(provider);
   if (poolSize > 0) {
     inputRunCount.value = String(poolSize);
@@ -4556,6 +5464,9 @@ function collectSettingsPayload() {
   const defaultPhoneCodePollMaxRounds = typeof DEFAULT_PHONE_CODE_POLL_MAX_ROUNDS !== 'undefined'
     ? DEFAULT_PHONE_CODE_POLL_MAX_ROUNDS
     : 12;
+  const defaultPhoneReuseMaxUses = typeof DEFAULT_PHONE_REUSE_MAX_USES !== 'undefined'
+    ? DEFAULT_PHONE_REUSE_MAX_USES
+    : 3;
   const selectedSignupMethod = typeof getSelectedSignupMethod === 'function'
     ? getSelectedSignupMethod()
     : (
@@ -4563,6 +5474,10 @@ function collectSettingsPayload() {
         ? normalizeSignupMethod(latestState?.signupMethod)
         : (String(latestState?.signupMethod || '').trim().toLowerCase() === 'phone' ? 'phone' : 'email'))
     );
+  const selectedAccountFlowMode = typeof getSelectedAccountFlowMode === 'function'
+    ? getSelectedAccountFlowMode(latestState)
+    : normalizeAccountFlowMode(latestState?.accountFlowMode || DEFAULT_ACCOUNT_FLOW_MODE);
+  const existingAccountReauthMode = selectedAccountFlowMode === ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH;
   const phoneSignupReuseLocked = typeof isPhoneSignupReuseLocked === 'function'
     ? isPhoneSignupReuseLocked(latestState, { signupMethod: selectedSignupMethod })
     : selectedSignupMethod === 'phone';
@@ -4676,6 +5591,20 @@ function collectSettingsPayload() {
     : typeof getSelectedPhonePreferredActivation === 'function'
     ? getSelectedPhonePreferredActivation()
     : null;
+  const phoneReuseMaxUsesValue = typeof inputPhoneReuseMaxUses !== 'undefined' && inputPhoneReuseMaxUses
+    ? (
+      typeof normalizePhoneReuseMaxUsesValue === 'function'
+        ? normalizePhoneReuseMaxUsesValue(
+          inputPhoneReuseMaxUses.value,
+          latestState?.phoneReuseMaxUses ?? defaultPhoneReuseMaxUses
+        )
+        : Math.max(1, Math.floor(Number(inputPhoneReuseMaxUses.value) || latestState?.phoneReuseMaxUses || defaultPhoneReuseMaxUses))
+    )
+    : (
+      typeof normalizePhoneReuseMaxUsesValue === 'function'
+        ? normalizePhoneReuseMaxUsesValue(latestState?.phoneReuseMaxUses, defaultPhoneReuseMaxUses)
+        : Math.max(1, Math.floor(Number(latestState?.phoneReuseMaxUses) || defaultPhoneReuseMaxUses))
+    );
   const phoneVerificationReplacementLimitValue = typeof inputPhoneReplacementLimit !== 'undefined' && inputPhoneReplacementLimit
     ? normalizePhoneVerificationReplacementLimit(
       inputPhoneReplacementLimit.value,
@@ -4737,6 +5666,9 @@ function collectSettingsPayload() {
       : []);
   const normalizedCustomEmailPoolEntries = typeof getNormalizedCustomEmailPoolEntriesState === 'function'
     ? getNormalizedCustomEmailPoolEntriesState()
+    : [];
+  const normalizedExistingAccountPoolEntries = typeof normalizeExistingAccountPoolEntryObjects === 'function'
+    ? normalizeExistingAccountPoolEntryObjects(latestState?.existingAccountPoolEntries || [])
     : [];
   const selectedPhoneSmsCountryFallback = typeof syncHeroSmsFallbackSelectionOrderFromSelect === 'function'
     ? syncHeroSmsFallbackSelectionOrderFromSelect()
@@ -4842,6 +5774,7 @@ function collectSettingsPayload() {
       state: {
         ...(latestState || {}),
         activeFlowId,
+        accountFlowMode: selectedAccountFlowMode,
         flowId: activeFlowId,
         targetId: selectedTargetId,
         plusModeEnabled: rawPlusModeEnabled,
@@ -4863,6 +5796,7 @@ function collectSettingsPayload() {
           state: {
             ...(latestState || {}),
             activeFlowId,
+            accountFlowMode: selectedAccountFlowMode,
             flowId: activeFlowId,
             targetId: selectedTargetId,
             plusModeEnabled: rawPlusModeEnabled,
@@ -4972,6 +5906,7 @@ function collectSettingsPayload() {
     });
   return {
     activeFlowId,
+    accountFlowMode: selectedAccountFlowMode,
     targetId: effectiveTargetId,
     kiroRsUrl: currentKiroRsUrlValue !== null
       ? (currentKiroRsUrlValue || defaultKiroRsUrl)
@@ -5092,13 +6027,18 @@ function collectSettingsPayload() {
         : (latestState?.gopayHelperLocalSmsHelperUrl || '')
     ),
     ...(accountContributionEnabled ? {} : {
-      customPassword: inputPassword.value,
+      customPassword: existingAccountReauthMode
+        ? String(latestState?.customPassword || '')
+        : inputPassword.value,
     }),
-    mailProvider: selectMailProvider.value,
+    mailProvider: existingAccountReauthMode
+      ? (String(latestState?.mailProvider || selectMailProvider.value || '').trim() || '163')
+      : selectMailProvider.value,
     mail2925Mode: getSelectedMail2925Mode(),
     mail2925UseAccountPool,
     currentMail2925AccountId: String(latestState?.currentMail2925AccountId || '').trim(),
     emailGenerator: selectEmailGenerator.value,
+    existingAccountPoolEntries: normalizedExistingAccountPoolEntries,
     customMailProviderPool: typeof normalizeCustomEmailPoolEntries === 'function'
       ? normalizeCustomEmailPoolEntries(inputCustomMailProviderPool?.value)
       : [],
@@ -5176,6 +6116,7 @@ function collectSettingsPayload() {
     heroSmsReuseEnabled: heroSmsReuseEnabledValue,
     freePhoneReuseEnabled: freePhoneReuseEnabledValue,
     freePhoneReuseAutoEnabled: freePhoneReuseAutoEnabledValue,
+    phoneReuseMaxUses: phoneReuseMaxUsesValue,
     heroSmsAcquirePriority: heroSmsAcquirePriorityValue,
     heroSmsMinPrice: heroSmsMinPriceValue,
     heroSmsMaxPrice: heroSmsMaxPriceValue,
@@ -5955,6 +6896,18 @@ function normalizePhoneVerificationReplacementLimit(value, fallback = DEFAULT_PH
     );
   }
   return Math.max(PHONE_REPLACEMENT_LIMIT_MIN, Math.min(PHONE_REPLACEMENT_LIMIT_MAX, parsed));
+}
+
+function normalizePhoneReuseMaxUsesValue(value, fallback = DEFAULT_PHONE_REUSE_MAX_USES) {
+  const rawValue = String(value ?? '').trim();
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed)) {
+    return Math.max(
+      PHONE_REUSE_MAX_USES_MIN,
+      Math.min(PHONE_REUSE_MAX_USES_MAX, Number(fallback) || DEFAULT_PHONE_REUSE_MAX_USES)
+    );
+  }
+  return Math.max(PHONE_REUSE_MAX_USES_MIN, Math.min(PHONE_REUSE_MAX_USES_MAX, parsed));
 }
 
 function normalizePhoneCodeWaitSecondsValue(value, fallback = DEFAULT_PHONE_CODE_WAIT_SECONDS) {
@@ -7510,9 +8463,17 @@ async function loadHeroSmsCountries(options = {}) {
   } else if (preferFallbackOnly) {
     applyHeroSmsFallbackOptions();
   } else try {
+    const apiKey = provider === PHONE_SMS_PROVIDER_HERO_SMS
+      ? String(inputHeroSmsApiKey?.value || '').trim()
+      : String(latestState?.heroSmsApiKey || '').trim();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
-    const response = await fetch('https://hero-sms.com/stubs/handler_api.php?action=getCountries', {
+    const url = new URL('https://hero-sms.com/stubs/handler_api.php');
+    url.searchParams.set('action', 'getCountries');
+    if (apiKey) {
+      url.searchParams.set('api_key', apiKey);
+    }
+    const response = await fetch(url.toString(), {
       signal: controller.signal,
       cache: 'no-store',
     });
@@ -8878,6 +9839,90 @@ function normalizeSignupMethod(value = '') {
     : 'email';
 }
 
+function normalizeAccountFlowMode(value = '') {
+  return String(value || '').trim().toLowerCase() === ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH
+    ? ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH
+    : ACCOUNT_FLOW_MODE_SIGNUP;
+}
+
+function getSelectedAccountFlowMode(state = latestState) {
+  return normalizeAccountFlowMode(
+    (typeof selectAccountFlowMode !== 'undefined' && selectAccountFlowMode
+      ? selectAccountFlowMode.value
+      : '')
+    || state?.accountFlowMode
+    || DEFAULT_ACCOUNT_FLOW_MODE
+  );
+}
+
+function isExistingAccountReauthMode(state = latestState, options = {}) {
+  const activeFlowId = typeof getSelectedFlowId === 'function'
+    ? getSelectedFlowId(state)
+    : normalizeFlowId(state?.activeFlowId || state?.flowId || DEFAULT_ACTIVE_FLOW_ID, DEFAULT_ACTIVE_FLOW_ID);
+  const accountFlowMode = Object.prototype.hasOwnProperty.call(options || {}, 'accountFlowMode')
+    ? options.accountFlowMode
+    : getSelectedAccountFlowMode(state);
+  return activeFlowId === DEFAULT_ACTIVE_FLOW_ID
+    && normalizeAccountFlowMode(accountFlowMode) === ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH;
+}
+
+function updateAccountFlowModeUI(state = latestState) {
+  const activeFlowId = typeof getSelectedFlowId === 'function'
+    ? getSelectedFlowId(state)
+    : normalizeFlowId(state?.activeFlowId || state?.flowId || DEFAULT_ACTIVE_FLOW_ID, DEFAULT_ACTIVE_FLOW_ID);
+  const canShowModeSelector = activeFlowId === DEFAULT_ACTIVE_FLOW_ID;
+  const accountFlowMode = getSelectedAccountFlowMode(state);
+  const existingAccountReauthMode = canShowModeSelector
+    && accountFlowMode === ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH;
+
+  currentAccountFlowMode = accountFlowMode;
+
+  if (rowAccountFlowMode) {
+    rowAccountFlowMode.style.display = canShowModeSelector ? '' : 'none';
+  }
+  if (selectAccountFlowMode) {
+    selectAccountFlowMode.value = accountFlowMode;
+  }
+  if (rowMailProvider) {
+    rowMailProvider.style.display = existingAccountReauthMode ? 'none' : '';
+  }
+  if (labelAccountEmail) {
+    labelAccountEmail.textContent = existingAccountReauthMode ? '登录邮箱' : '注册邮箱';
+  }
+  if (rowAutoRunControls) {
+    rowAutoRunControls.style.display = existingAccountReauthMode ? 'none' : '';
+  }
+  if (inputEmail) {
+    inputEmail.placeholder = existingAccountReauthMode
+      ? '请输入已注册邮箱'
+      : '自动生成或手动粘贴邮箱';
+  }
+  syncAccountEmailPrivacyMaskMode(existingAccountReauthMode);
+  if (labelAccountPassword) {
+    labelAccountPassword.textContent = existingAccountReauthMode
+      ? '登录密码（可选，不填则走一次性验证码）'
+      : '账户密码';
+  }
+  if (inputPassword) {
+    inputPassword.placeholder = existingAccountReauthMode
+      ? '登录密码，留空则走一次性验证码登录'
+      : '账户密码，留空则自动生成';
+  }
+  if (rowCustomPassword) {
+    rowCustomPassword.style.display = existingAccountReauthMode ? 'none' : '';
+  }
+  if (rowExistingAccountPool) {
+    rowExistingAccountPool.style.display = existingAccountReauthMode ? '' : 'none';
+  }
+  if (btnFetchEmail) {
+    btnFetchEmail.style.display = existingAccountReauthMode ? 'none' : '';
+  }
+  updateExistingAccountPoolSummary();
+  if (existingAccountReauthMode) {
+    syncRunCountFromConfiguredEmailPool();
+  }
+}
+
 function isPhoneSignupReuseLocked(state = latestState, options = {}) {
   const hasOptionMethod = Object.prototype.hasOwnProperty.call(options || {}, 'signupMethod');
   const rawMethod = hasOptionMethod
@@ -9218,6 +10263,12 @@ function resolveStepDefinitionCapabilityState(state = latestState, options = {})
     state: nextState,
   });
   return {
+    accountFlowMode: capabilityState?.stepDefinitionOptions?.accountFlowMode
+      || normalizeAccountFlowMode(
+        options?.accountFlowMode
+        ?? nextState?.accountFlowMode
+        ?? DEFAULT_ACCOUNT_FLOW_MODE
+      ),
     capabilityState,
     plusModeEnabled: capabilityState
       ? Boolean(capabilityState.runtimeLocks?.plusModeEnabled)
@@ -9266,6 +10317,9 @@ function getSelectedPanelMode(state = latestState) {
 }
 
 function getSelectedSignupMethod() {
+  if (isExistingAccountReauthMode(latestState)) {
+    return SIGNUP_METHOD_EMAIL;
+  }
   const activeButton = signupMethodButtons.find((button) => button.classList.contains('is-active'));
   return normalizeSignupMethod(activeButton?.dataset.signupMethod || latestState?.signupMethod || DEFAULT_SIGNUP_METHOD);
 }
@@ -9339,9 +10393,19 @@ function updateSignupMethodUI(options = {}) {
     return;
   }
 
-  const showSignupMethod = Boolean(inputPhoneVerificationEnabled?.checked);
+  const existingAccountReauthMode = isExistingAccountReauthMode(latestState);
+  const showSignupMethod = Boolean(inputPhoneVerificationEnabled?.checked) && !existingAccountReauthMode;
   if (rowSignupMethod) {
     rowSignupMethod.style.display = showSignupMethod ? '' : 'none';
+  }
+  if (existingAccountReauthMode) {
+    if (typeof rowPhoneSignupReloginAfterBindEmail !== 'undefined' && rowPhoneSignupReloginAfterBindEmail) {
+      rowPhoneSignupReloginAfterBindEmail.style.display = 'none';
+    }
+    if (typeof syncSignupPhoneInputFromState === 'function') {
+      syncSignupPhoneInputFromState(latestState);
+    }
+    return;
   }
 
   let selectedMethod = normalizeSignupMethod(getSelectedSignupMethod());
@@ -9395,6 +10459,7 @@ function updateSignupMethodUI(options = {}) {
       signupMethod: selectedMethod,
     };
   syncStepDefinitionsForMode(stepDefinitionState.plusModeEnabled, {
+    accountFlowMode: stepDefinitionState.accountFlowMode,
     plusPaymentMethod: getSelectedPlusPaymentMethod(latestState),
     signupMethod: selectedMethod,
     phoneSignupReloginAfterBindEmailEnabled: typeof inputPhoneSignupReloginAfterBindEmail !== 'undefined' && inputPhoneSignupReloginAfterBindEmail
@@ -9448,10 +10513,12 @@ function updatePhoneVerificationSettingsUI() {
     : true;
   const enabled = canShowPhoneSettings && rawEnabled;
   const showSettings = enabled && phoneVerificationSectionExpanded;
+  const existingAccountReauthMode = isExistingAccountReauthMode(latestState);
   const selectedSignupMethodForPhoneSettings = typeof getSelectedSignupMethod === 'function'
     ? getSelectedSignupMethod()
     : normalizeSignupMethod(latestState?.signupMethod || DEFAULT_SIGNUP_METHOD);
   const showPhoneSignupReloginAfterBindEmail = showSettings
+    && !existingAccountReauthMode
     && selectedSignupMethodForPhoneSettings === SIGNUP_METHOD_PHONE;
   const normalizeProvider = typeof normalizePhoneSmsProviderValue === 'function'
     ? normalizePhoneSmsProviderValue
@@ -9512,6 +10579,7 @@ function updatePhoneVerificationSettingsUI() {
     typeof rowFiveSimOperator !== 'undefined' ? rowFiveSimOperator : null,
     typeof rowPhoneCodeSettingsGroup !== 'undefined' ? rowPhoneCodeSettingsGroup : null,
     typeof rowPhoneVerificationResendCount !== 'undefined' ? rowPhoneVerificationResendCount : null,
+    typeof rowPhoneReuseMaxUses !== 'undefined' ? rowPhoneReuseMaxUses : null,
     typeof rowPhoneReplacementLimit !== 'undefined' ? rowPhoneReplacementLimit : null,
     typeof rowPhoneCodeWaitSeconds !== 'undefined' ? rowPhoneCodeWaitSeconds : null,
     typeof rowPhoneCodeTimeoutWindows !== 'undefined' ? rowPhoneCodeTimeoutWindows : null,
@@ -9549,6 +10617,9 @@ function updatePhoneVerificationSettingsUI() {
   }
   if (typeof rowFreePhoneReuseAutoEnabled !== 'undefined' && rowFreePhoneReuseAutoEnabled) {
     rowFreePhoneReuseAutoEnabled.style.display = showSettings ? '' : 'none';
+  }
+  if (typeof rowPhoneReuseMaxUses !== 'undefined' && rowPhoneReuseMaxUses) {
+    rowPhoneReuseMaxUses.style.display = showSettings ? '' : 'none';
   }
   const phoneSignupReuseLocked = typeof isPhoneSignupReuseLocked === 'function'
     ? isPhoneSignupReuseLocked(latestState, {
@@ -9588,6 +10659,9 @@ function updatePhoneVerificationSettingsUI() {
   if (typeof inputHeroSmsReuseEnabled !== 'undefined' && inputHeroSmsReuseEnabled) {
     inputHeroSmsReuseEnabled.disabled = settingsLocked || phoneSignupReuseLocked;
   }
+  if (typeof inputPhoneReuseMaxUses !== 'undefined' && inputPhoneReuseMaxUses) {
+    inputPhoneReuseMaxUses.disabled = settingsLocked || phoneSignupReuseLocked;
+  }
   if (typeof inputFreePhoneReuseAutoEnabled !== 'undefined' && inputFreePhoneReuseAutoEnabled) {
     inputFreePhoneReuseAutoEnabled.disabled = settingsLocked || phoneSignupReuseLocked || !freePhoneReuseAutoAvailable;
     if (!freePhoneReuseAutoAvailable) {
@@ -9611,6 +10685,10 @@ function updatePhoneVerificationSettingsUI() {
     ? inputHeroSmsReuseEnabled.closest('.hero-sms-price-control')
     : null;
   setElementReuseLockedState(heroSmsReuseRow, phoneSignupReuseLocked);
+  setElementReuseLockedState(
+    typeof rowPhoneReuseMaxUses !== 'undefined' ? rowPhoneReuseMaxUses : null,
+    phoneSignupReuseLocked
+  );
   setElementReuseLockedState(
     typeof rowFreePhoneReuseEnabled !== 'undefined' ? rowFreePhoneReuseEnabled : null,
     phoneSignupReuseLocked
@@ -10059,6 +11137,10 @@ function syncSignupPhoneInputFromState(state = latestState) {
     }
   }
   if (typeof rowSignupPhone !== 'undefined' && rowSignupPhone) {
+    const existingAccountReauthMode = isExistingAccountReauthMode({
+      ...(latestState || {}),
+      ...(state || {}),
+    });
     const phoneVerificationEnabled = typeof inputPhoneVerificationEnabled !== 'undefined' && inputPhoneVerificationEnabled
       ? Boolean(inputPhoneVerificationEnabled.checked)
       : Boolean(state?.phoneVerificationEnabled || latestState?.phoneVerificationEnabled);
@@ -10112,6 +11194,7 @@ function syncSignupPhoneInputFromState(state = latestState) {
       ? Boolean(capabilityState.canShowPhoneSettings)
       : true;
     rowSignupPhone.style.display = canShowPhoneSettings
+      && !existingAccountReauthMode
       && phoneVerificationEnabled
       && (selectedMethod === 'phone' || Boolean(signupPhone) || Boolean(getSignupPhoneInputValue()) || signupPhoneInputDirty)
       ? ''
@@ -10879,6 +11962,9 @@ function syncStepDefinitionsForMode(plusModeEnabled = false, plusPaymentMethodOr
   const options = typeof plusPaymentMethodOrOptions === 'string'
     ? maybeOptions
     : (plusPaymentMethodOrOptions || {});
+  const nextAccountFlowMode = normalizeAccountFlowMode(
+    options.accountFlowMode || currentAccountFlowMode || DEFAULT_ACCOUNT_FLOW_MODE
+  );
   const rawPaymentMethod = typeof plusPaymentMethodOrOptions === 'string'
     ? plusPaymentMethodOrOptions
     : (options.plusPaymentMethod || getSelectedPlusPaymentMethod(latestState));
@@ -10914,6 +12000,7 @@ function syncStepDefinitionsForMode(plusModeEnabled = false, plusPaymentMethodOr
   const currentPaymentStep = stepDefinitions.find((step) => step.key === 'paypal-approve');
   const nextPaymentTitle = rootScope.MultiPageStepDefinitions?.getPlusPaymentStepTitle?.({
     activeFlowId: nextActiveFlowId,
+    accountFlowMode: nextAccountFlowMode,
     plusModeEnabled: nextPlusModeEnabled,
     plusPaymentMethod: nextPaymentMethod,
     plusAccountAccessStrategy: nextPlusAccountAccessStrategy,
@@ -10926,6 +12013,7 @@ function syncStepDefinitionsForMode(plusModeEnabled = false, plusPaymentMethodOr
     || nextPlusModeEnabled !== currentPlusModeEnabled
     || nextPaymentMethod !== currentPlusPaymentMethod
     || nextPlusAccountAccessStrategy !== currentPlusAccountAccessStrategy
+    || nextAccountFlowMode !== currentAccountFlowMode
     || nextSignupMethod !== currentSignupMethod
     || nextPhoneVerificationEnabled !== currentPhoneVerificationEnabled
     || nextPhoneSignupReloginAfterBindEmailEnabled !== currentPhoneSignupReloginAfterBindEmailEnabled
@@ -10938,6 +12026,7 @@ function syncStepDefinitionsForMode(plusModeEnabled = false, plusPaymentMethodOr
 
   rebuildStepDefinitionState(nextPlusModeEnabled, {
     activeFlowId: nextActiveFlowId,
+    accountFlowMode: nextAccountFlowMode,
     plusPaymentMethod: nextPaymentMethod,
     plusAccountAccessStrategy: nextPlusAccountAccessStrategy,
     signupMethod: nextSignupMethod,
@@ -10966,6 +12055,7 @@ function syncStepDefinitionsFromUiState(stateOverrides = {}) {
     };
   syncStepDefinitionsForMode(stepDefinitionState.plusModeEnabled, {
     activeFlowId: nextState?.activeFlowId || nextState?.flowId || DEFAULT_ACTIVE_FLOW_ID,
+    accountFlowMode: stepDefinitionState.accountFlowMode,
     plusPaymentMethod: getSelectedPlusPaymentMethod(nextState),
     plusAccountAccessStrategy: stepDefinitionState.plusAccountAccessStrategy,
     signupMethod: stepDefinitionState.signupMethod,
@@ -10992,6 +12082,7 @@ function applySettingsState(state) {
       };
     syncStepDefinitionsForMode(stepDefinitionState.plusModeEnabled, {
       activeFlowId: state?.activeFlowId || state?.flowId,
+      accountFlowMode: stepDefinitionState.accountFlowMode,
       plusPaymentMethod: state?.plusPaymentMethod,
       signupMethod: stepDefinitionState.signupMethod,
       phoneVerificationEnabled: Boolean(stepDefinitionState.phoneVerificationEnabled),
@@ -11046,6 +12137,9 @@ function applySettingsState(state) {
     return Math.max(1, Math.min(1440, numeric));
   };
   syncLatestState(state);
+  if (selectAccountFlowMode) {
+    selectAccountFlowMode.value = normalizeAccountFlowMode(state?.accountFlowMode || DEFAULT_ACCOUNT_FLOW_MODE);
+  }
   const defaultActiveFlowId = typeof DEFAULT_ACTIVE_FLOW_ID === 'string' ? DEFAULT_ACTIVE_FLOW_ID : 'openai';
   const appliedFlowSelection = typeof syncFlowSelectorsFromState === 'function'
     ? syncFlowSelectorsFromState(state)
@@ -11394,6 +12488,7 @@ function applySettingsState(state) {
   } else if (inputCustomEmailPool) {
     inputCustomEmailPool.value = restoredCustomEmailPoolEntries.join('\n');
   }
+  updateExistingAccountPoolSummary();
   setHotmailServiceMode(state?.hotmailServiceMode);
   inputHotmailRemoteBaseUrl.value = state?.hotmailRemoteBaseUrl || '';
   inputHotmailLocalBaseUrl.value = state?.hotmailLocalBaseUrl || '';
@@ -11513,6 +12608,13 @@ function applySettingsState(state) {
   }
   if (typeof inputHeroSmsPreferredPrice !== 'undefined' && inputHeroSmsPreferredPrice) {
     inputHeroSmsPreferredPrice.value = normalizeHeroSmsMaxPriceValue(state?.heroSmsPreferredPrice || '');
+  }
+  if (typeof inputPhoneReuseMaxUses !== 'undefined' && inputPhoneReuseMaxUses) {
+    inputPhoneReuseMaxUses.value = String(
+      typeof normalizePhoneReuseMaxUsesValue === 'function'
+        ? normalizePhoneReuseMaxUsesValue(state?.phoneReuseMaxUses, DEFAULT_PHONE_REUSE_MAX_USES)
+        : Math.max(1, Math.floor(Number(state?.phoneReuseMaxUses) || DEFAULT_PHONE_REUSE_MAX_USES))
+    );
   }
   if (typeof inputPhoneReplacementLimit !== 'undefined' && inputPhoneReplacementLimit) {
     inputPhoneReplacementLimit.value = String(
@@ -12835,6 +13937,9 @@ function updateIpProxyServiceLoginButtonState(options = {}) {
 }
 
 function updateMailProviderUI() {
+  const existingAccountReauthMode = typeof isExistingAccountReauthMode === 'function'
+    ? isExistingAccountReauthMode(latestState)
+    : false;
   const normalizeIcloudHostValue = typeof normalizeIcloudHost === 'function'
     ? normalizeIcloudHost
     : ((value) => {
@@ -12928,7 +14033,7 @@ function updateMailProviderUI() {
     rowMail2925PoolSettings.style.display = useMail2925 ? '' : 'none';
   }
   if (typeof rowCustomMailProviderPool !== 'undefined' && rowCustomMailProviderPool) {
-    rowCustomMailProviderPool.style.display = useCustomEmail ? '' : 'none';
+    rowCustomMailProviderPool.style.display = !existingAccountReauthMode && useCustomEmail ? '' : 'none';
   }
   rowEmailPrefix.style.display = useGeneratedAlias && !useMail2925AccountPool ? '' : 'none';
   const hotmailServiceMode = getSelectedHotmailServiceMode();
@@ -13526,6 +14631,9 @@ function updatePanelModeUI() {
   if (typeof applyFlowSettingsGroupVisibility === 'function') {
     applyFlowSettingsGroupVisibility(visibleGroupIds);
   }
+  if (typeof updateAccountFlowModeUI === 'function') {
+    updateAccountFlowModeUI(latestState);
+  }
   if (typeof updatePlusModeUI === 'function') {
     updatePlusModeUI();
   }
@@ -14010,6 +15118,37 @@ function installPrivacyMaskedInput(input) {
   button.dataset.showLabel = button.dataset.showLabel || labels.show;
   button.dataset.hideLabel = button.dataset.hideLabel || labels.hide;
   syncPasswordVisibilityToggle(button);
+}
+
+function uninstallPrivacyMaskedInput(input) {
+  if (!input) {
+    return;
+  }
+  input.type = 'text';
+  input.classList?.remove('data-input-with-icon');
+  const shell = input.parentElement?.classList?.contains('input-with-icon')
+    ? input.parentElement
+    : null;
+  const button = shell?.querySelector?.(`[data-password-toggle="${input.id}"]`) || null;
+  if (button) {
+    button.remove();
+  }
+  if (shell?.parentElement) {
+    shell.parentElement.insertBefore(input, shell);
+    shell.remove();
+  }
+}
+
+function syncAccountEmailPrivacyMaskMode(existingAccountReauthMode = isExistingAccountReauthMode(latestState)) {
+  if (!inputEmail) {
+    return;
+  }
+  if (existingAccountReauthMode) {
+    uninstallPrivacyMaskedInput(inputEmail);
+    return;
+  }
+  installPrivacyMaskedInput(inputEmail);
+  bindPasswordVisibilityToggles(document);
 }
 
 function syncPrivacyTextareaToggle(button, textarea) {
@@ -16402,6 +17541,160 @@ inputCustomMailProviderPool?.addEventListener('blur', () => {
   saveSettings({ silent: true }).catch(() => { });
 });
 
+inputExistingAccountPool?.addEventListener('input', () => {
+  updateExistingAccountPoolSummary();
+});
+inputExistingAccountPool?.addEventListener('blur', () => {
+  setExistingAccountPoolDraftInputValue(inputExistingAccountPool.value);
+});
+
+inputExistingAccountPoolSearch?.addEventListener('input', () => {
+  existingAccountPoolSearchTerm = normalizeExistingAccountPoolSearchText(inputExistingAccountPoolSearch.value);
+  renderExistingAccountPoolPreview(latestState);
+});
+
+selectExistingAccountPoolFilter?.addEventListener('change', () => {
+  existingAccountPoolFilterMode = String(selectExistingAccountPoolFilter.value || 'all').trim().toLowerCase() || 'all';
+  renderExistingAccountPoolPreview(latestState);
+});
+
+btnExistingAccountPoolImport?.addEventListener('click', () => {
+  if (!inputExistingAccountPoolImport) {
+    return;
+  }
+  inputExistingAccountPoolImport.value = '';
+  inputExistingAccountPoolImport.click();
+});
+
+btnExistingAccountPoolDeleteAll?.addEventListener('click', async () => {
+  try {
+    const currentEntries = getPersistedExistingAccountPoolEntries();
+    if (!currentEntries.length) {
+      showToast('账号池已经是空的。', 'warn');
+      return;
+    }
+    const confirmed = await openConfirmModal({
+      title: '清空重新授权账号池',
+      message: `确定要删除当前 ${currentEntries.length} 个重新授权账号吗？此操作会立即保存。`,
+      confirmLabel: '清空列表',
+      confirmVariant: 'btn-danger',
+      alert: {
+        text: '仅清空重新授权账号池，不会删除账号运行记录。',
+        tone: 'danger',
+      },
+    });
+    if (!confirmed) {
+      return;
+    }
+    await saveExistingAccountPoolEntries([], { silent: true, force: true });
+    showToast('重新授权账号池已清空', 'success', 1800);
+  } catch (error) {
+    showToast(`清空账号池失败：${error.message}`, 'error');
+  }
+});
+
+btnExistingAccountPoolApply?.addEventListener('click', async () => {
+  try {
+    const currentEntries = getPersistedExistingAccountPoolEntries();
+    const draftEntries = getExistingAccountPoolEntriesFromInput();
+    if (!draftEntries.length) {
+      showToast('请输入或导入至少一个有效账号后再确认导入。', 'warn');
+      return;
+    }
+    const nextEntries = normalizeExistingAccountPoolEntryObjects([
+      ...currentEntries,
+      ...draftEntries,
+    ]);
+    const importedCount = Math.max(0, nextEntries.length - currentEntries.length);
+    if (importedCount === 0) {
+      showToast('草稿里的账号都已存在于账号池中。', 'warn');
+      return;
+    }
+    await saveExistingAccountPoolEntries(nextEntries, {
+      silent: true,
+      force: true,
+      clearDraft: true,
+    });
+    showToast(`已确认导入 ${importedCount} 个重新授权账号`, 'success', 1800);
+  } catch (error) {
+    showToast(`确认导入失败：${error.message}`, 'error');
+  }
+});
+
+checkboxExistingAccountPoolSelectAll?.addEventListener('change', () => {
+  const visibleEntries = getFilteredExistingAccountPoolPreviewEntries(latestState);
+  if (checkboxExistingAccountPoolSelectAll.checked) {
+    visibleEntries.forEach((entry) => {
+      existingAccountPoolSelectedIds.add(String(entry.id || ''));
+    });
+  } else {
+    visibleEntries.forEach((entry) => {
+      existingAccountPoolSelectedIds.delete(String(entry.id || ''));
+    });
+  }
+  renderExistingAccountPoolPreview(latestState);
+});
+
+btnExistingAccountPoolBulkDelete?.addEventListener('click', async () => {
+  try {
+    const currentEntries = getPersistedExistingAccountPoolEntries();
+    pruneExistingAccountPoolSelection(currentEntries);
+    if (existingAccountPoolSelectedIds.size === 0) {
+      showToast('请先勾选要删除的账号。', 'warn');
+      return;
+    }
+    const confirmed = await openConfirmModal({
+      title: '批量删除重新授权账号',
+      message: `确定要删除已选的 ${existingAccountPoolSelectedIds.size} 个账号吗？此操作会立即保存。`,
+      confirmLabel: '批量删除',
+      confirmVariant: 'btn-danger',
+      alert: {
+        text: '仅删除账号池条目，不会删除账号运行记录。',
+        tone: 'danger',
+      },
+    });
+    if (!confirmed) {
+      return;
+    }
+    const nextEntries = currentEntries.filter(
+      (entry) => !existingAccountPoolSelectedIds.has(String(entry.id || ''))
+    );
+    await saveExistingAccountPoolEntries(nextEntries, { silent: true, force: true });
+    existingAccountPoolSelectedIds.clear();
+    updateExistingAccountPoolBulkUi(getFilteredExistingAccountPoolPreviewEntries(latestState));
+    showToast('已批量删除选中的重新授权账号', 'success', 1800);
+  } catch (error) {
+    showToast(`批量删除失败：${error.message}`, 'error');
+  }
+});
+
+inputExistingAccountPoolImport?.addEventListener('change', async () => {
+  const file = inputExistingAccountPoolImport.files?.[0];
+  inputExistingAccountPoolImport.value = '';
+  if (!file) {
+    return;
+  }
+
+  try {
+    const currentEntries = getExistingAccountPoolEntriesFromInput();
+    const importedText = await file.text();
+    const nextDraftEntries = normalizeExistingAccountPoolEntryObjects([
+      ...currentEntries,
+      ...normalizeExistingAccountPoolEntryObjects(importedText),
+    ]);
+    if (!nextDraftEntries.length) {
+      showToast('未解析到有效账号，请检查导入格式。', 'warn');
+      return;
+    }
+
+    const importedCount = Math.max(0, nextDraftEntries.length - currentEntries.length);
+    setExistingAccountPoolDraftInputValue(nextDraftEntries);
+    showToast(`已载入 ${importedCount} 个账号到导入草稿，点击“确认导入”后才会加入账号池`, 'success', 2200);
+  } catch (err) {
+    showToast(`导入重新授权账号池失败：${err.message}`, 'error');
+  }
+});
+
 selectMail2925PoolAccount?.addEventListener('change', async () => {
   try {
     await syncSelectedMail2925PoolAccount();
@@ -16578,6 +17871,25 @@ selectFlow?.addEventListener('change', () => {
       phoneSignupReloginAfterBindEmailEnabled: typeof inputPhoneSignupReloginAfterBindEmail !== 'undefined' && inputPhoneSignupReloginAfterBindEmail
         ? Boolean(inputPhoneSignupReloginAfterBindEmail.checked)
         : Boolean(latestState?.phoneSignupReloginAfterBindEmailEnabled),
+    });
+  }
+  applyStepExecutionRangeState(latestState);
+  renderStepStatuses(latestState);
+  updateButtonStates();
+  markSettingsDirty(true);
+  saveSettings({ silent: true }).catch(() => { });
+});
+
+selectAccountFlowMode?.addEventListener('change', () => {
+  const nextAccountFlowMode = normalizeAccountFlowMode(selectAccountFlowMode.value);
+  selectAccountFlowMode.value = nextAccountFlowMode;
+  syncLatestState({
+    accountFlowMode: nextAccountFlowMode,
+  });
+  updatePanelModeUI();
+  if (typeof syncStepDefinitionsFromUiState === 'function') {
+    syncStepDefinitionsFromUiState({
+      accountFlowMode: nextAccountFlowMode,
     });
   }
   applyStepExecutionRangeState(latestState);
@@ -17117,6 +18429,18 @@ btnPhoneSmsBalance?.addEventListener('click', async () => {
 inputPhoneReplacementLimit?.addEventListener('input', () => {
   markSettingsDirty(true);
   scheduleSettingsAutoSave();
+});
+inputPhoneReuseMaxUses?.addEventListener('input', () => {
+  markSettingsDirty(true);
+  scheduleSettingsAutoSave();
+});
+inputPhoneReuseMaxUses?.addEventListener('blur', () => {
+  inputPhoneReuseMaxUses.value = String(
+    typeof normalizePhoneReuseMaxUsesValue === 'function'
+      ? normalizePhoneReuseMaxUsesValue(inputPhoneReuseMaxUses.value, DEFAULT_PHONE_REUSE_MAX_USES)
+      : Math.max(1, Math.floor(Number(inputPhoneReuseMaxUses.value) || DEFAULT_PHONE_REUSE_MAX_USES))
+  );
+  saveSettings({ silent: true }).catch(() => { });
 });
 inputPhoneReplacementLimit?.addEventListener('blur', () => {
   inputPhoneReplacementLimit.value = String(
@@ -17723,6 +19047,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message.payload.cloudMailDomain !== undefined && inputCloudMailDomain) {
         inputCloudMailDomain.value = message.payload.cloudMailDomain || '';
       }
+      if (message.payload.accountFlowMode !== undefined && selectAccountFlowMode) {
+        selectAccountFlowMode.value = normalizeAccountFlowMode(message.payload.accountFlowMode);
+        updateAccountFlowModeUI(latestState);
+      }
       if (message.payload.plusModeEnabled !== undefined && inputPlusModeEnabled) {
         inputPlusModeEnabled.checked = Boolean(message.payload.plusModeEnabled);
       }
@@ -17758,7 +19086,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         }
       }
       if (
-        message.payload.plusModeEnabled !== undefined
+        message.payload.accountFlowMode !== undefined
+        || message.payload.plusModeEnabled !== undefined
         || message.payload.plusPaymentMethod !== undefined
         || message.payload.plusAccountAccessStrategy !== undefined
         || message.payload.gopayHelperPhoneMode !== undefined
@@ -17768,9 +19097,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       ) {
         const stepDefinitionState = typeof resolveStepDefinitionCapabilityState === 'function'
           ? resolveStepDefinitionCapabilityState(latestState, {
+            accountFlowMode: latestState?.accountFlowMode,
             signupMethod: latestState?.signupMethod,
           })
           : {
+            accountFlowMode: normalizeAccountFlowMode(latestState?.accountFlowMode || DEFAULT_ACCOUNT_FLOW_MODE),
             plusModeEnabled: Boolean(latestState?.plusModeEnabled),
             signupMethod: normalizeSignupMethod(latestState?.signupMethod || DEFAULT_SIGNUP_METHOD),
           };
@@ -17778,10 +19109,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           stepDefinitionState.plusModeEnabled,
           latestState?.plusPaymentMethod,
           {
+            accountFlowMode: stepDefinitionState.accountFlowMode,
             render: true,
             signupMethod: stepDefinitionState.signupMethod,
           }
         );
+        updateAccountFlowModeUI(latestState);
         updatePlusModeUI();
         updateSignupMethodUI({ notify: true });
       }
@@ -17817,6 +19150,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         }));
         syncRunCountFromConfiguredEmailPool();
         queueCustomEmailPoolRefresh();
+      }
+      if (message.payload.existingAccountPoolEntries !== undefined) {
+        updateExistingAccountPoolSummary();
       }
       if (message.payload.luckmailApiKey !== undefined) {
         inputLuckmailApiKey.value = message.payload.luckmailApiKey || '';
@@ -17979,6 +19315,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message.payload.heroSmsPreferredPrice !== undefined && typeof inputHeroSmsPreferredPrice !== 'undefined' && inputHeroSmsPreferredPrice) {
         inputHeroSmsPreferredPrice.value = normalizeHeroSmsMaxPriceValue(message.payload.heroSmsPreferredPrice);
       }
+      if (message.payload.phoneReuseMaxUses !== undefined && typeof inputPhoneReuseMaxUses !== 'undefined' && inputPhoneReuseMaxUses) {
+        inputPhoneReuseMaxUses.value = String(
+          typeof normalizePhoneReuseMaxUsesValue === 'function'
+            ? normalizePhoneReuseMaxUsesValue(message.payload.phoneReuseMaxUses, DEFAULT_PHONE_REUSE_MAX_USES)
+            : Math.max(1, Math.floor(Number(message.payload.phoneReuseMaxUses) || DEFAULT_PHONE_REUSE_MAX_USES))
+        );
+      }
       if (message.payload.phoneVerificationReplacementLimit !== undefined && typeof inputPhoneReplacementLimit !== 'undefined' && inputPhoneReplacementLimit) {
         inputPhoneReplacementLimit.value = String(
           normalizePhoneVerificationReplacementLimit(
@@ -18035,12 +19378,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message.payload.phoneVerificationEnabled !== undefined && inputPhoneVerificationEnabled) {
         inputPhoneVerificationEnabled.checked = Boolean(message.payload.phoneVerificationEnabled);
       }
+      if (message.payload.accountFlowMode !== undefined && selectAccountFlowMode) {
+        selectAccountFlowMode.value = normalizeAccountFlowMode(message.payload.accountFlowMode);
+        updateAccountFlowModeUI(latestState);
+      }
       if (message.payload.signupMethod !== undefined) {
         setSignupMethod(message.payload.signupMethod);
       }
-      if (message.payload.phoneVerificationEnabled !== undefined || message.payload.signupMethod !== undefined) {
+      if (
+        message.payload.accountFlowMode !== undefined
+        || message.payload.phoneVerificationEnabled !== undefined
+        || message.payload.signupMethod !== undefined
+      ) {
         updatePhoneVerificationSettingsUI();
         syncStepDefinitionsFromUiState({
+          accountFlowMode: typeof getSelectedAccountFlowMode === 'function'
+            ? getSelectedAccountFlowMode(latestState)
+            : latestState?.accountFlowMode,
           phoneVerificationEnabled: inputPhoneVerificationEnabled
             ? Boolean(inputPhoneVerificationEnabled.checked)
             : Boolean(latestState?.phoneVerificationEnabled),

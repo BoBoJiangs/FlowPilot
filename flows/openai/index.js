@@ -96,6 +96,7 @@
   },
   "settingsDefaults": {
     "signup": {
+      "accountFlowMode": "signup",
       "signupMethod": "email",
       "phoneVerificationEnabled": false,
       "phoneSignupReloginAfterBindEmailEnabled": false

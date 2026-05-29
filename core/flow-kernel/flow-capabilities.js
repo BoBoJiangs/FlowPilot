@@ -7,6 +7,8 @@
   const settingsSchemaApi = rootScope.MultiPageSettingsSchema || {};
   const DEFAULT_FLOW_ID = flowRegistryApi.DEFAULT_FLOW_ID || 'openai';
   const DEFAULT_OPENAI_TARGET_ID = flowRegistryApi.DEFAULT_OPENAI_TARGET_ID || 'cpa';
+  const ACCOUNT_FLOW_MODE_SIGNUP = 'signup';
+  const ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH = 'existing_account_reauth';
   const SIGNUP_METHOD_EMAIL = 'email';
   const SIGNUP_METHOD_PHONE = 'phone';
   const PLUS_ACCOUNT_ACCESS_STRATEGY_OAUTH = 'oauth';
@@ -68,6 +70,7 @@
     'phoneVerificationEnabled',
     'plusModeEnabled',
     'signupMethod',
+    'accountFlowMode',
     'plusAccountAccessStrategy',
     'targetId',
   ]);
@@ -108,6 +111,12 @@
     return VALID_OPENAI_TARGET_IDS.includes(fallbackValue)
       ? fallbackValue
       : DEFAULT_OPENAI_TARGET_ID;
+  }
+
+  function normalizeAccountFlowMode(value = '') {
+    return String(value || '').trim().toLowerCase() === ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH
+      ? ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH
+      : ACCOUNT_FLOW_MODE_SIGNUP;
   }
 
   function normalizeSignupMethod(value = '') {
@@ -310,11 +319,21 @@
       const targetState = activeFlowId === 'openai'
         ? getOpenAiTargetCapabilities(effectiveTargetId)
         : defaultTargetCapabilities;
+      const accountFlowMode = activeFlowId === 'openai'
+        ? normalizeAccountFlowMode(options?.accountFlowMode ?? state?.accountFlowMode)
+        : ACCOUNT_FLOW_MODE_SIGNUP;
+      const existingAccountReauthMode = activeFlowId === 'openai'
+        && accountFlowMode === ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH;
       const runtimeLocks = {
         autoRunLocked: Boolean(options?.autoRunLocked ?? state?.autoRunLocked),
-        accountContribution: Boolean(flowState.supportsAccountContribution) && Boolean(state?.accountContributionEnabled),
+        accountContribution: !existingAccountReauthMode
+          && Boolean(flowState.supportsAccountContribution)
+          && Boolean(state?.accountContributionEnabled),
         phoneVerificationEnabled: activeFlowId === 'openai' && flowState.supportsPhoneVerificationSettings && Boolean(state?.phoneVerificationEnabled),
-        plusModeEnabled: activeFlowId === 'openai' && flowState.supportsPlusMode && Boolean(state?.plusModeEnabled),
+        plusModeEnabled: !existingAccountReauthMode
+          && activeFlowId === 'openai'
+          && flowState.supportsPlusMode
+          && Boolean(state?.plusModeEnabled),
         settingsMenuLocked: Boolean(options?.settingsMenuLocked ?? state?.settingsMenuLocked),
       };
       const effectiveSignupMethods = [];
@@ -322,6 +341,7 @@
         effectiveSignupMethods.push(SIGNUP_METHOD_EMAIL);
       }
       const canSelectPhoneSignup = activeFlowId === 'openai'
+        && !existingAccountReauthMode
         && Boolean(flowState.supportsPhoneSignup)
         && Boolean(targetState.supportsPhoneSignup)
         && runtimeLocks.phoneVerificationEnabled
@@ -379,10 +399,13 @@
 
       return {
         activeFlowId,
-        canShowContributionMode: Boolean(flowState.supportsAccountContribution),
+        accountFlowMode,
+        canShowContributionMode: Boolean(flowState.supportsAccountContribution) && !existingAccountReauthMode,
         canShowLuckmail: activeFlowId === 'openai' && Boolean(flowState.supportsLuckmail),
         canShowPhoneSettings: activeFlowId === 'openai' && Boolean(flowState.supportsPhoneVerificationSettings),
-        canShowPlusSettings: activeFlowId === 'openai' && Boolean(flowState.supportsPlusMode),
+        canShowPlusSettings: activeFlowId === 'openai'
+          && Boolean(flowState.supportsPlusMode)
+          && !existingAccountReauthMode,
         canSwitchFlow: Boolean(flowState.canSwitchFlow),
         canEditPlusAccountAccessStrategy,
         canUsePhoneSignup: canSelectPhoneSignup,
@@ -402,6 +425,7 @@
           && Boolean(targetState.requiresPhoneSignupWarning),
         stepDefinitionOptions: {
           activeFlowId,
+          accountFlowMode,
           targetId: effectiveTargetId,
           plusAccountAccessStrategy: effectivePlusAccountAccessStrategy,
           plusModeEnabled: runtimeLocks.plusModeEnabled,
@@ -515,6 +539,8 @@
       const flowState = capabilityState.flowCapabilities || {};
       const requestedPhoneSignup = capabilityState.requestedSignupMethod === SIGNUP_METHOD_PHONE;
       const shouldReconcileSignupMethod = MODE_SWITCH_RELEVANT_KEYS.some((key) => changedKeySet.has(key));
+      const existingAccountReauthMode = capabilityState.activeFlowId === 'openai'
+        && capabilityState.accountFlowMode === ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH;
 
       if (
         changedKeySet.has('targetId')
@@ -567,7 +593,21 @@
         && capabilityState.effectiveSignupMethod !== SIGNUP_METHOD_PHONE
       ) {
         normalizedUpdates.signupMethod = capabilityState.effectiveSignupMethod;
-        errors.push(buildPhoneSignupValidationError(capabilityState));
+        if (!existingAccountReauthMode) {
+          errors.push(buildPhoneSignupValidationError(capabilityState));
+        }
+      }
+
+      if (existingAccountReauthMode) {
+        if (Boolean(state?.plusModeEnabled)) {
+          normalizedUpdates.plusModeEnabled = false;
+        }
+        if (Boolean(state?.accountContributionEnabled)) {
+          normalizedUpdates.accountContributionEnabled = false;
+        }
+        if (normalizeSignupMethod(state?.signupMethod) !== SIGNUP_METHOD_EMAIL) {
+          normalizedUpdates.signupMethod = SIGNUP_METHOD_EMAIL;
+        }
       }
 
       return {

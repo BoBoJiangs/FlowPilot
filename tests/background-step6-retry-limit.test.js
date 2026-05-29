@@ -881,6 +881,175 @@ test('step 7 can start from a manually filled signup phone without completed ste
   ]);
 });
 
+test('step 7 existing-account reauth forces email login and can continue without password', async () => {
+  const source = fs.readFileSync('flows/openai/background/steps/oauth-login.js', 'utf8');
+  const globalScope = {};
+  const api = new Function('self', `${source}; return self.MultiPageBackgroundStep7;`)(globalScope);
+
+  const events = {
+    payloads: [],
+  };
+
+  const executor = api.createStep7Executor({
+    addLog: async () => {},
+    completeNodeFromBackground: async () => {},
+    getErrorMessage: (error) => error?.message || String(error || ''),
+    getLoginAuthStateLabel: (state) => state || 'unknown',
+    getState: async () => ({
+      accountFlowMode: 'existing_account_reauth',
+      email: 'reauth.user@example.com',
+      signupMethod: 'phone',
+      resolvedSignupMethod: 'phone',
+      accountIdentifierType: 'phone',
+      accountIdentifier: '+447780579093',
+      signupPhoneNumber: '+447780579093',
+      password: '',
+      customPassword: '',
+    }),
+    isStep6RecoverableResult: (result) => result?.step6Outcome === 'recoverable',
+    isStep6SuccessResult: (result) => result?.step6Outcome === 'success',
+    refreshOAuthUrlBeforeStep6: async () => 'https://oauth.example/reauth',
+    reuseOrCreateTab: async () => {},
+    sendToContentScriptResilient: async (_sourceName, message) => {
+      events.payloads.push(message.payload);
+      return {
+        step6Outcome: 'success',
+        state: 'verification_page',
+        loginVerificationRequestedAt: 123456,
+      };
+    },
+    STEP6_MAX_ATTEMPTS: 3,
+    throwIfStopped: () => {},
+  });
+
+  await executor.executeStep7({
+    accountFlowMode: 'existing_account_reauth',
+    email: 'reauth.user@example.com',
+    signupMethod: 'phone',
+    resolvedSignupMethod: 'phone',
+    accountIdentifierType: 'phone',
+    accountIdentifier: '+447780579093',
+    signupPhoneNumber: '+447780579093',
+    password: '',
+    customPassword: '',
+  });
+
+  assert.deepStrictEqual(events.payloads, [
+    {
+      email: 'reauth.user@example.com',
+      phoneNumber: '',
+      countryId: null,
+      countryLabel: '',
+      accountIdentifier: 'reauth.user@example.com',
+      loginIdentifierType: 'email',
+      password: '',
+      visibleStep: 7,
+    },
+  ]);
+});
+
+test('step 7 existing-account reauth reports a mode-specific missing email error', async () => {
+  const source = fs.readFileSync('flows/openai/background/steps/oauth-login.js', 'utf8');
+  const globalScope = {};
+  const api = new Function('self', `${source}; return self.MultiPageBackgroundStep7;`)(globalScope);
+
+  const executor = api.createStep7Executor({
+    addLog: async () => {},
+    completeNodeFromBackground: async () => {},
+    getErrorMessage: (error) => error?.message || String(error || ''),
+    getLoginAuthStateLabel: (state) => state || 'unknown',
+    getState: async () => ({
+      accountFlowMode: 'existing_account_reauth',
+      signupMethod: 'phone',
+      resolvedSignupMethod: 'phone',
+      accountIdentifierType: 'phone',
+      accountIdentifier: '+447780579093',
+      signupPhoneNumber: '+447780579093',
+    }),
+    isStep6RecoverableResult: (result) => result?.step6Outcome === 'recoverable',
+    isStep6SuccessResult: (result) => result?.step6Outcome === 'success',
+    refreshOAuthUrlBeforeStep6: async () => 'https://oauth.example/reauth',
+    reuseOrCreateTab: async () => {},
+    sendToContentScriptResilient: async () => ({ step6Outcome: 'success' }),
+    STEP6_MAX_ATTEMPTS: 3,
+    throwIfStopped: () => {},
+  });
+
+  await assert.rejects(
+    () => executor.executeStep7({
+      accountFlowMode: 'existing_account_reauth',
+      signupMethod: 'phone',
+      resolvedSignupMethod: 'phone',
+      accountIdentifierType: 'phone',
+      accountIdentifier: '+447780579093',
+      signupPhoneNumber: '+447780579093',
+    }),
+    /请先在“已有账号重新授权\/绑手机号”模式下填写登录邮箱/
+  );
+});
+
+test('step 7 existing-account reauth treats direct OAuth consent as completed reauth when no phone binding appears', async () => {
+  const source = fs.readFileSync('flows/openai/background/steps/oauth-login.js', 'utf8');
+  const globalScope = {};
+  const api = new Function('self', `${source}; return self.MultiPageBackgroundStep7;`)(globalScope);
+
+  const events = {
+    completions: [],
+    logs: [],
+  };
+
+  const executor = api.createStep7Executor({
+    addLog: async (message, level = 'info', options = {}) => {
+      events.logs.push({ message, level, step: options.step, stepKey: options.stepKey });
+    },
+    completeNodeFromBackground: async (step, payload) => {
+      events.completions.push({ step, payload });
+    },
+    getErrorMessage: (error) => error?.message || String(error || ''),
+    getLoginAuthStateLabel: (state) => state || 'unknown',
+    getState: async () => ({
+      accountFlowMode: 'existing_account_reauth',
+      email: 'reauth.user@example.com',
+      password: 'secret',
+    }),
+    isStep6RecoverableResult: (result) => result?.step6Outcome === 'recoverable',
+    isStep6SuccessResult: (result) => result?.step6Outcome === 'success',
+    refreshOAuthUrlBeforeStep6: async () => 'https://oauth.example/reauth',
+    reuseOrCreateTab: async () => {},
+    sendToContentScriptResilient: async () => ({
+      step6Outcome: 'success',
+      state: 'oauth_consent_page',
+      directOAuthConsentPage: true,
+    }),
+    STEP6_MAX_ATTEMPTS: 3,
+    throwIfStopped: () => {},
+  });
+
+  await executor.executeStep7({
+    accountFlowMode: 'existing_account_reauth',
+    email: 'reauth.user@example.com',
+    password: 'secret',
+    visibleStep: 7,
+  });
+
+  assert.ok(events.logs.some((entry) => (
+    entry.message === '当前账号未进入补绑手机号链路，视为授权完成。'
+    && entry.level === 'ok'
+    && entry.step === 7
+    && entry.stepKey === 'oauth-login'
+  )));
+  assert.deepStrictEqual(events.completions, [
+    {
+      step: 'oauth-login',
+      payload: {
+        loginVerificationRequestedAt: null,
+        skipLoginVerificationStep: true,
+        directOAuthConsentPage: true,
+      },
+    },
+  ]);
+});
+
 test('step 7 stops immediately when management secret is missing', async () => {
   const source = fs.readFileSync('flows/openai/background/steps/oauth-login.js', 'utf8');
   const globalScope = {};

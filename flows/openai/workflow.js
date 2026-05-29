@@ -1,6 +1,8 @@
 (function attachMultiPageOpenAiWorkflow(root, factory) {
   root.MultiPageOpenAiWorkflow = factory();
 })(typeof self !== 'undefined' ? self : globalThis, function createMultiPageOpenAiWorkflow() {
+  const ACCOUNT_FLOW_MODE_SIGNUP = 'signup';
+  const ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH = 'existing_account_reauth';
   const SIGNUP_METHOD_EMAIL = 'email';
   const SIGNUP_METHOD_PHONE = 'phone';
   const PLUS_PAYMENT_METHOD_PAYPAL = 'paypal';
@@ -87,6 +89,59 @@
       "command": "wait-registration-success",
       "flowId": "openai"
     },
+    {
+      "id": 7,
+      "order": 70,
+      "key": "oauth-login",
+      "title": "刷新 OAuth 并登录",
+      "sourceId": "openai-auth",
+      "driverId": "flows/openai/content/openai-auth",
+      "command": "oauth-login",
+      "flowId": "openai"
+    },
+    {
+      "id": 8,
+      "order": 80,
+      "key": "fetch-login-code",
+      "title": "获取登录验证码",
+      "sourceId": "openai-auth",
+      "driverId": "flows/openai/content/openai-auth",
+      "command": "submit-verification-code",
+      "mailRuleId": "openai-login-code",
+      "flowId": "openai"
+    },
+    {
+      "id": 9,
+      "order": 90,
+      "key": "post-login-phone-verification",
+      "title": "手机号验证",
+      "sourceId": "openai-auth",
+      "driverId": "flows/openai/content/openai-auth",
+      "command": "post-login-phone-verification",
+      "flowId": "openai"
+    },
+    {
+      "id": 10,
+      "order": 100,
+      "key": "confirm-oauth",
+      "title": "自动确认 OAuth",
+      "sourceId": "openai-auth",
+      "driverId": "flows/openai/content/openai-auth",
+      "command": "confirm-oauth",
+      "flowId": "openai"
+    },
+    {
+      "id": 11,
+      "order": 110,
+      "key": "platform-verify",
+      "title": "平台回调验证",
+      "sourceId": "platform-panel",
+      "driverId": "content/platform-panel",
+      "command": "platform-verify",
+      "flowId": "openai"
+    }
+  ],
+  "existingAccountReauthEmail": [
     {
       "id": 7,
       "order": 70,
@@ -3120,6 +3175,12 @@
       : SIGNUP_METHOD_EMAIL;
   }
 
+  function normalizeAccountFlowMode(value = '') {
+    return String(value || '').trim().toLowerCase() === ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH
+      ? ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH
+      : ACCOUNT_FLOW_MODE_SIGNUP;
+  }
+
   function isPhoneSignupReloginAfterBindEmailEnabled(options = {}) {
     return Boolean(options?.phoneSignupReloginAfterBindEmailEnabled);
   }
@@ -3143,6 +3204,9 @@
   }
 
   function resolveVariantKey(options = {}) {
+    if (normalizeAccountFlowMode(options?.accountFlowMode) === ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH) {
+      return 'existingAccountReauthEmail';
+    }
     const signupMethod = normalizeSignupMethod(options?.resolvedSignupMethod || options?.signupMethod);
     const reloginAfterBindEmail = signupMethod === SIGNUP_METHOD_PHONE && isPhoneSignupReloginAfterBindEmailEnabled(options);
     if (!isPlusModeEnabled(options)) {
@@ -3211,7 +3275,9 @@
 
   function getModeStepDefinitions(options = {}) {
     const isPlusMode = isPlusModeEnabled(options);
-    let steps = getVariantStepDefinitions(resolveVariantKey(options));
+    const variantKey = resolveVariantKey(options);
+    const preserveOriginalStepIds = variantKey === 'existingAccountReauthEmail';
+    let steps = getVariantStepDefinitions(variantKey);
     if (isPlusMode) {
       steps = insertPlusRegistrationWaitStep(steps);
     }
@@ -3224,7 +3290,9 @@
     if (!isPhoneVerificationEnabled(options)) {
       steps = omitPostLoginPhoneVerificationSteps(steps);
     }
-    return reindexModeStepDefinitions(steps);
+    return preserveOriginalStepIds
+      ? steps.map((step) => ({ ...step }))
+      : reindexModeStepDefinitions(steps);
   }
 
   function getAllSteps() {

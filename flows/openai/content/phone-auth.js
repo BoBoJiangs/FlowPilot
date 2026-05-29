@@ -22,6 +22,7 @@
     const PHONE_RESEND_THROTTLED_ERROR_PREFIX = 'PHONE_RESEND_THROTTLED::';
     const PHONE_RESEND_BANNED_NUMBER_ERROR_PREFIX = 'PHONE_RESEND_BANNED_NUMBER::';
     const PHONE_RESEND_SERVER_ERROR_PREFIX = 'PHONE_RESEND_SERVER_ERROR::';
+    const PHONE_SMS_CHANNEL_UNAVAILABLE_ERROR_PREFIX = 'PHONE_SMS_CHANNEL_UNAVAILABLE::';
     const PHONE_MAX_USAGE_EXCEEDED_PATTERN = /phone_max_usage_exceeded/i;
     const PHONE_ROUTE_405_RECOVERY_FAILED_ERROR_PREFIX = 'PHONE_ROUTE_405_RECOVERY_FAILED::';
     const PHONE_ROUTE_405_RECOVERY_COOLDOWN_MS = 6000;
@@ -382,6 +383,203 @@
       return buttons.find((button) => isVisibleElement(button) && isActionEnabled(button))
         || buttons.find((button) => isVisibleElement(button))
         || null;
+    }
+
+    function getPhoneDeliveryChannelActionText(element) {
+      if (!element) return '';
+      return [
+        element.getAttribute?.('aria-label'),
+        element.getAttribute?.('title'),
+        element.getAttribute?.('value'),
+        getActionText?.(element),
+        element.textContent,
+      ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function getPhoneDeliveryChannel(value) {
+      const text = String(value || '').replace(/\s+/g, ' ').trim();
+      if (!text) {
+        return '';
+      }
+      if (/whats\s*app/i.test(text)) {
+        return 'whatsapp';
+      }
+      if (/(?:^|\b)(?:sms|text(?:\s+message)?)(?:\b|$)|短信|简讯|テキスト|メッセージ/i.test(text)) {
+        return 'sms';
+      }
+      return '';
+    }
+
+    function isPhoneDeliveryChannelOptionEnabled(element) {
+      if (!element) {
+        return false;
+      }
+      if (typeof isActionEnabled === 'function' && isActionEnabled(element)) {
+        return true;
+      }
+      const ariaDisabled = String(element.getAttribute?.('aria-disabled') || '').trim().toLowerCase();
+      if (ariaDisabled === 'true') {
+        return false;
+      }
+      return element.disabled !== true;
+    }
+
+    function isPhoneDeliveryChannelOptionSelected(element) {
+      if (!element) {
+        return false;
+      }
+
+      const stateValues = [
+        element.getAttribute?.('aria-pressed'),
+        element.getAttribute?.('aria-selected'),
+        element.getAttribute?.('aria-checked'),
+        element.getAttribute?.('data-selected'),
+        element.getAttribute?.('data-state'),
+        element.getAttribute?.('data-checked'),
+      ];
+      for (const value of stateValues) {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (!normalized) {
+          continue;
+        }
+        if (['true', 'selected', 'checked', 'active', 'pressed', 'on'].includes(normalized)) {
+          return true;
+        }
+        if (['false', 'unselected', 'unchecked', 'inactive', 'off'].includes(normalized)) {
+          return false;
+        }
+      }
+
+      if (element.checked === true) {
+        return true;
+      }
+
+      const checkedDescendant = element.querySelector?.(
+        'input[type="radio"]:checked, input[type="checkbox"]:checked'
+      );
+      if (checkedDescendant) {
+        return true;
+      }
+
+      const className = String(element.className || '').trim();
+      if (className && /\b(?:selected|active|checked|pressed|current)\b/i.test(className)) {
+        return !/\b(?:unselected|inactive)\b/i.test(className);
+      }
+
+      return false;
+    }
+
+    function getAddPhoneDeliveryChannelOptions() {
+      const form = getAddPhoneForm();
+      if (!form) {
+        return [];
+      }
+
+      const selector = [
+        'button',
+        '[role="button"]',
+        '[role="radio"]',
+        '[role="tab"]',
+        'label',
+        'input[type="radio"]',
+        'input[type="button"]',
+      ].join(', ');
+      const seen = new Set();
+      const candidates = Array.from(form.querySelectorAll(selector));
+      return candidates.reduce((result, element) => {
+        if (!element || seen.has(element) || !isVisibleElement(element)) {
+          return result;
+        }
+        seen.add(element);
+
+        const text = getPhoneDeliveryChannelActionText(element);
+        const channel = getPhoneDeliveryChannel(text);
+        if (!channel) {
+          return result;
+        }
+
+        result.push({
+          element,
+          channel,
+          text,
+          selected: isPhoneDeliveryChannelOptionSelected(element),
+          enabled: isPhoneDeliveryChannelOptionEnabled(element),
+        });
+        return result;
+      }, []);
+    }
+
+    async function ensureSmsDeliveryChannelSelected() {
+      const options = getAddPhoneDeliveryChannelOptions();
+      const smsOptions = options.filter((option) => option.channel === 'sms');
+      if (!options.length) {
+        return {
+          applicable: true,
+          available: false,
+          clicked: false,
+          reason: 'missing_delivery_options',
+          message: 'Add-phone page does not expose SMS or WhatsApp delivery options for the current number.',
+          options,
+        };
+      }
+
+      if (!smsOptions.length) {
+        const optionSummary = options
+          .map((option) => option.text || option.channel || '')
+          .filter(Boolean)
+          .join(', ');
+        return {
+          applicable: true,
+          available: false,
+          clicked: false,
+          reason: 'sms_unavailable',
+          message: optionSummary
+            ? `Add-phone page only exposes unsupported delivery channels: ${optionSummary}.`
+            : 'Add-phone page does not expose a usable SMS delivery channel for the current number.',
+          options,
+        };
+      }
+
+      if (smsOptions.some((option) => option.selected)) {
+        return {
+          applicable: true,
+          available: true,
+          clicked: false,
+          selected: 'sms',
+          options,
+        };
+      }
+
+      const target = smsOptions.find((option) => option.enabled) || null;
+      if (!target?.element) {
+        return {
+          applicable: true,
+          available: false,
+          clicked: false,
+          blocked: true,
+          reason: 'sms_option_disabled',
+          message: 'Add-phone page exposes SMS delivery but the SMS option is currently disabled.',
+          options,
+        };
+      }
+
+      await humanPause(150, 350);
+      await performOperationWithDelay({ stepKey: 'phone-auth', kind: 'click', label: 'phone-delivery-channel-sms' }, async () => {
+        simulateClick(target.element);
+      });
+      await sleep(250);
+      return {
+        applicable: true,
+        available: true,
+        clicked: true,
+        selected: 'sms',
+        options,
+      };
+    }
+
+    function formatUnavailableSmsDeliveryChannelMessage(result = null) {
+      const detail = String(result?.message || '').trim();
+      return `${PHONE_SMS_CHANNEL_UNAVAILABLE_ERROR_PREFIX}${detail || 'Add-phone page does not expose a usable SMS delivery channel for the current number.'}`;
     }
 
     function getPhoneVerificationCodeInput() {
@@ -756,6 +954,11 @@
         throw new Error(`Failed to select "${countryLabel || 'target country'}" on the add-phone page.`);
       }
 
+      const initialSmsSelection = await ensureSmsDeliveryChannelSelected();
+      if (initialSmsSelection?.available === false) {
+        throw new Error(formatUnavailableSmsDeliveryChannelMessage(initialSmsSelection));
+      }
+
       const dialCode = getDisplayedDialCode();
       if (!dialCode && !isExplicitInternational) {
         throw new Error(`Could not determine the dial code for "${countryLabel}" on the add-phone page.`);
@@ -772,13 +975,9 @@
         10000
       );
       const hiddenPhoneNumberInput = getHiddenPhoneNumberInput();
-      const submitButton = getAddPhoneSubmitButton();
 
       if (!phoneInput) {
         throw new Error('Add-phone page is missing the phone number input.');
-      }
-      if (!submitButton) {
-        throw new Error('Add-phone page is missing the submit button.');
       }
 
       await humanPause(250, 700);
@@ -792,6 +991,30 @@
         });
       }
       await sleep(250);
+      const smsSelection = await ensureSmsDeliveryChannelSelected();
+      if (smsSelection?.available === false) {
+        throw new Error(formatUnavailableSmsDeliveryChannelMessage(smsSelection));
+      }
+      if (smsSelection?.clicked) {
+        const refreshedPhoneInput = getPhoneInput();
+        if (refreshedPhoneInput && String(refreshedPhoneInput.value || '').trim() !== nationalPhoneNumber) {
+          await performOperationWithDelay({ stepKey: 'phone-auth', kind: 'fill', label: 'phone-number-refresh' }, async () => {
+            fillInput(refreshedPhoneInput, nationalPhoneNumber);
+          });
+        }
+        const refreshedHiddenPhoneNumberInput = getHiddenPhoneNumberInput();
+        if (refreshedHiddenPhoneNumberInput && String(refreshedHiddenPhoneNumberInput.value || '').trim() !== phoneNumber) {
+          await performOperationWithDelay({ stepKey: 'phone-auth', kind: 'hidden-sync', label: 'phone-number-hidden-sync-refresh' }, async () => {
+            refreshedHiddenPhoneNumberInput.value = phoneNumber;
+            dispatchInputEvents(refreshedHiddenPhoneNumberInput);
+          });
+        }
+        await sleep(150);
+      }
+      const submitButton = getAddPhoneSubmitButton();
+      if (!submitButton) {
+        throw new Error('Add-phone page is missing the submit button.');
+      }
       await performOperationWithDelay({ stepKey: 'phone-auth', kind: 'submit', label: 'phone-number-submit' }, async () => {
         simulateClick(submitButton);
       });

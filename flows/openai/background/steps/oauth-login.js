@@ -50,6 +50,16 @@
       return String(value || '').trim().toLowerCase() === 'phone' ? 'phone' : 'email';
     }
 
+    function normalizeStep7AccountFlowMode(value = '') {
+      return String(value || '').trim().toLowerCase() === 'existing_account_reauth'
+        ? 'existing_account_reauth'
+        : 'signup';
+    }
+
+    function isStep7ExistingAccountReauthMode(state = {}) {
+      return normalizeStep7AccountFlowMode(state?.accountFlowMode) === 'existing_account_reauth';
+    }
+
     function isStep7BoundEmailReloginContext(state = {}) {
       const nodeId = String(
         state?.nodeId
@@ -63,6 +73,9 @@
     }
 
     function resolveForcedStep7IdentifierType(state = {}) {
+      if (isStep7ExistingAccountReauthMode(state)) {
+        return 'email';
+      }
       const forcedIdentifierType = normalizeStep7IdentifierType(state?.forceLoginIdentifierType);
       if (forcedIdentifierType === 'phone') {
         return 'phone';
@@ -80,6 +93,9 @@
     }
 
     function isPhoneSignupMethodForStep7(state = {}) {
+      if (isStep7ExistingAccountReauthMode(state)) {
+        return false;
+      }
       return normalizeStep7SignupMethod(state?.signupMethod) === 'phone'
         || normalizeStep7SignupMethod(state?.resolvedSignupMethod) === 'phone';
     }
@@ -263,7 +279,11 @@
         (resolvedIdentifierType === 'phone' && !phoneNumber)
         || (resolvedIdentifierType !== 'phone' && !email)
       ) {
-        throw new Error('缺少登录账号：请先完成步骤 2，或在侧栏“注册邮箱/注册手机号”中手动填写账号后再执行当前步骤。');
+        throw new Error(
+          isStep7ExistingAccountReauthMode(state)
+            ? '缺少登录账号：请先在“已有账号重新授权/绑手机号”模式下填写登录邮箱。'
+            : '缺少登录账号：请先完成步骤 2，或在侧栏“注册邮箱/注册手机号”中手动填写账号后再执行当前步骤。'
+        );
       }
 
       const forceEmailLoginForThisRun = shouldForceStep7EmailLogin(state);
@@ -389,6 +409,18 @@
               currentIdentifierType,
               currentPhoneNumber
             );
+
+            if (
+              isStep7ExistingAccountReauthMode(currentState)
+              && completionPayload.directOAuthConsentPage
+              && !completionPayload.addPhonePage
+              && !completionPayload.phoneVerificationPage
+            ) {
+              await addLog('当前账号未进入补绑手机号链路，视为授权完成。', 'ok', {
+                step: completionStep,
+                stepKey: 'oauth-login',
+              });
+            }
 
             await completeNodeFromBackground(state?.nodeId || 'oauth-login', completionPayload);
             return;

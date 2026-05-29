@@ -123,6 +123,9 @@ test('sidepanel html exposes phone verification toggle and multi-provider SMS ro
   assert.match(html, /白嫖复用/);
   assert.match(html, /自动白嫖复用/);
   assert.match(html, /id="row-phone-replacement-limit"/);
+  assert.match(html, /id="row-phone-reuse-max-uses"/);
+  assert.match(html, /id="input-phone-reuse-max-uses"/);
+  assert.match(html, /同号绑定上限/);
   assert.match(html, /id="row-phone-verification-resend-count"/);
   assert.match(html, /id="row-phone-code-wait-seconds"/);
   assert.match(html, /id="row-phone-code-timeout-windows"/);
@@ -456,7 +459,15 @@ const inputSignupPhone = { value: '+442222222222' };
 const rowSignupPhone = { style: { display: 'none' } };
 const inputPhoneVerificationEnabled = { checked: true };
 const document = { activeElement: inputSignupPhone };
+const DEFAULT_ACTIVE_FLOW_ID = 'openai';
+const ACCOUNT_FLOW_MODE_SIGNUP = 'signup';
+const ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH = 'existing_account_reauth';
+const DEFAULT_ACCOUNT_FLOW_MODE = ACCOUNT_FLOW_MODE_SIGNUP;
 function getSelectedSignupMethod() { return 'phone'; }
+function getSelectedFlowId() { return 'openai'; }
+${extractFunction('normalizeAccountFlowMode')}
+${extractFunction('getSelectedAccountFlowMode')}
+${extractFunction('isExistingAccountReauthMode')}
 ${extractFunction('normalizeSignupMethod')}
 ${extractFunction('getRuntimeSignupPhoneValue')}
 ${extractFunction('getSignupPhoneInputValue')}
@@ -678,6 +689,7 @@ const rowHeroSmsPriceTiers = { style: { display: 'none' } };
 const rowHeroSmsCurrentCode = { style: { display: 'none' } };
 const rowHeroSmsPreferredActivation = createMockRow();
 const rowPhoneVerificationResendCount = { style: { display: 'none' } };
+const rowPhoneReuseMaxUses = createMockRow();
 const rowPhoneReplacementLimit = { style: { display: 'none' } };
 const rowPhoneCodeWaitSeconds = { style: { display: 'none' } };
 const rowPhoneCodeTimeoutWindows = { style: { display: 'none' } };
@@ -688,6 +700,7 @@ const rowFreePhoneReuseAutoEnabled = createMockRow();
 const rowFreeReusablePhone = createMockRow();
 const heroSmsReuseRow = createMockRow();
 const inputHeroSmsReuseEnabled = { checked: true, disabled: false, closest: () => heroSmsReuseRow };
+const inputPhoneReuseMaxUses = { value: '3', disabled: false };
 const inputFreePhoneReuseEnabled = { checked: true, disabled: false };
 const inputFreePhoneReuseAutoEnabled = { checked: true, disabled: false };
 const selectHeroSmsPreferredActivation = { disabled: false };
@@ -713,7 +726,15 @@ function setFreePhoneReuseControlsLocked(locked) {
     || !Boolean(inputPhoneVerificationEnabled.checked && phoneVerificationSectionExpanded);
 }
 function isAutoRunLockedPhase() { return false; }
+const DEFAULT_ACTIVE_FLOW_ID = 'openai';
+const ACCOUNT_FLOW_MODE_SIGNUP = 'signup';
+const ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH = 'existing_account_reauth';
+const DEFAULT_ACCOUNT_FLOW_MODE = ACCOUNT_FLOW_MODE_SIGNUP;
+function getSelectedFlowId() { return 'openai'; }
 
+${extractFunction('normalizeAccountFlowMode')}
+${extractFunction('getSelectedAccountFlowMode')}
+${extractFunction('isExistingAccountReauthMode')}
 ${extractFunction('normalizeSignupMethod')}
 ${extractFunction('normalizeHeroSmsReuseEnabledValue')}
 ${extractFunction('isPhoneSignupReuseLocked')}
@@ -762,6 +783,7 @@ return {
   rowFreePhoneReuseAutoEnabled,
   rowFreeReusablePhone,
   rowPhoneVerificationResendCount,
+  rowPhoneReuseMaxUses,
   rowPhoneReplacementLimit,
   rowPhoneCodeWaitSeconds,
   rowPhoneCodeTimeoutWindows,
@@ -769,6 +791,7 @@ return {
   rowPhoneCodePollMaxRounds,
   heroSmsReuseRow,
   inputHeroSmsReuseEnabled,
+  inputPhoneReuseMaxUses,
   inputFreePhoneReuseEnabled,
   inputFreePhoneReuseAutoEnabled,
   selectHeroSmsPreferredActivation,
@@ -854,6 +877,7 @@ return {
   assert.equal(api.rowHeroSmsCurrentCode.style.display, '');
   assert.equal(api.rowHeroSmsPreferredActivation.style.display, '');
   assert.equal(api.rowPhoneVerificationResendCount.style.display, '');
+  assert.equal(api.rowPhoneReuseMaxUses.style.display, '');
   assert.equal(api.rowPhoneReplacementLimit.style.display, '');
   assert.equal(api.rowPhoneCodeWaitSeconds.style.display, '');
   assert.equal(api.rowPhoneCodeTimeoutWindows.style.display, '');
@@ -891,6 +915,7 @@ return {
   api.updatePhoneVerificationSettingsUI();
   assert.equal(api.inputHeroSmsReuseEnabled.checked, true);
   assert.equal(api.inputHeroSmsReuseEnabled.disabled, false);
+  assert.equal(api.inputPhoneReuseMaxUses.disabled, false);
   assert.equal(api.inputFreePhoneReuseEnabled.checked, true);
   assert.equal(api.inputFreePhoneReuseEnabled.disabled, false);
   assert.equal(api.inputFreePhoneReuseAutoEnabled.checked, true);
@@ -1006,6 +1031,7 @@ function getSelectedPhonePreferredActivation() {
 const inputHeroSmsMaxPrice = { value: '0.12' };
 const inputHeroSmsMinPrice = { value: '0.03' };
 const inputHeroSmsPreferredPrice = { value: '0.0512' };
+const inputPhoneReuseMaxUses = { value: '7' };
 const inputPhoneReplacementLimit = { value: '5' };
 const inputPhoneCodeWaitSeconds = { value: '75' };
 const inputPhoneCodeTimeoutWindows = { value: '3' };
@@ -1014,6 +1040,9 @@ const inputPhoneCodePollMaxRounds = { value: '18' };
 const inputAccountRunHistoryHelperBaseUrl = { value: 'http://127.0.0.1:17373' };
 const DEFAULT_VERIFICATION_RESEND_COUNT = 4;
 const DEFAULT_PHONE_VERIFICATION_REPLACEMENT_LIMIT = 3;
+const PHONE_REUSE_MAX_USES_MIN = 1;
+const PHONE_REUSE_MAX_USES_MAX = 20;
+const DEFAULT_PHONE_REUSE_MAX_USES = 3;
 const DEFAULT_PHONE_CODE_WAIT_SECONDS = 60;
 const DEFAULT_PHONE_CODE_TIMEOUT_WINDOWS = 2;
 const DEFAULT_PHONE_CODE_POLL_INTERVAL_SECONDS = 5;
@@ -1041,6 +1070,9 @@ const DEFAULT_PHONE_SMS_PROVIDER = PHONE_SMS_PROVIDER_HERO_SMS;
 const SIGNUP_METHOD_EMAIL = 'email';
 const SIGNUP_METHOD_PHONE = 'phone';
 const DEFAULT_SIGNUP_METHOD = SIGNUP_METHOD_EMAIL;
+const ACCOUNT_FLOW_MODE_SIGNUP = 'signup';
+const ACCOUNT_FLOW_MODE_EXISTING_ACCOUNT_REAUTH = 'existing_account_reauth';
+const DEFAULT_ACCOUNT_FLOW_MODE = ACCOUNT_FLOW_MODE_SIGNUP;
 const DEFAULT_FIVE_SIM_COUNTRY_ID = 'vietnam';
 const DEFAULT_FIVE_SIM_COUNTRY_LABEL = '越南 (Vietnam)';
 const DEFAULT_FIVE_SIM_OPERATOR = 'any';
@@ -1073,6 +1105,7 @@ function normalizeAutoStepDelaySeconds(value) { return value === '' ? null : Num
 function normalizeVerificationResendCount(value, fallback) { return Number(value) || fallback; }
 function normalizePlusAccountAccessStrategy(value = '') { return String(value || '').trim().toLowerCase() === PLUS_ACCOUNT_ACCESS_STRATEGY_SUB2API_CODEX_SESSION ? PLUS_ACCOUNT_ACCESS_STRATEGY_SUB2API_CODEX_SESSION : PLUS_ACCOUNT_ACCESS_STRATEGY_OAUTH; }
 function resolvePlusAccountAccessStrategyForTarget(value = '') { return normalizePlusAccountAccessStrategy(value); }
+function getSelectedAccountFlowMode() { return 'signup'; }
 ${extractFunction('normalizePhoneSmsProvider')}
 ${extractFunction('normalizePhoneSmsProviderValue')}
 ${extractFunction('normalizeFiveSimCountryCode')}
@@ -1092,6 +1125,7 @@ ${extractFunction('normalizePhoneSmsMaxPriceValue')}
 ${extractFunction('normalizePhoneSmsMinPriceValue')}
 ${extractFunction('normalizeHeroSmsMaxPriceValue')}
 ${extractFunction('normalizePhoneVerificationReplacementLimit')}
+${extractFunction('normalizePhoneReuseMaxUsesValue')}
 ${extractFunction('normalizePhoneCodeWaitSecondsValue')}
 ${extractFunction('normalizePhoneCodeTimeoutWindowsValue')}
 ${extractFunction('normalizePhoneCodePollIntervalSecondsValue')}
@@ -1155,6 +1189,7 @@ return { collectSettingsPayload };
     successfulUses: 2,
     maxUses: 3,
   });
+  assert.equal(payload.phoneReuseMaxUses, 7);
   assert.equal(payload.phoneVerificationReplacementLimit, 5);
   assert.equal(payload.phoneCodeWaitSeconds, 75);
   assert.equal(payload.phoneCodeTimeoutWindows, 3);
@@ -1437,4 +1472,18 @@ test('hero sms max price input does not auto-save partial typing states', () => 
     sidepanelSource,
     /inputHeroSmsMinPrice\?\.\s*addEventListener\('input',\s*\(\)\s*=>\s*\{\s*markSettingsDirty\(true\);\s*scheduleSettingsAutoSave\(\);/
   );
+});
+
+test('sidepanel existing-account reauth mode exposes mode selector and swaps signup-only account UI to login semantics', () => {
+  assert.match(sidepanelHtml, /id="row-account-flow-mode"/);
+  assert.match(sidepanelHtml, /id="select-account-flow-mode"/);
+  assert.match(sidepanelHtml, /<option value="signup">新账号注册<\/option>/);
+  assert.match(sidepanelHtml, /<option value="existing_account_reauth">已有账号重新授权\/绑手机号<\/option>/);
+  assert.match(sidepanelSource, /labelAccountEmail\.textContent = existingAccountReauthMode \? '登录邮箱' : '注册邮箱';/);
+  assert.match(sidepanelSource, /rowAutoRunControls\.style\.display = existingAccountReauthMode \? 'none' : '';/);
+  assert.match(sidepanelSource, /labelAccountPassword\.textContent = existingAccountReauthMode\s*\? '登录密码（可选，不填则走一次性验证码）'\s*: '账户密码';/);
+  assert.match(sidepanelSource, /rowCustomPassword\.style\.display = existingAccountReauthMode \? 'none' : '';/);
+  assert.match(sidepanelSource, /const showSignupMethod = Boolean\(inputPhoneVerificationEnabled\?\.checked\) && !existingAccountReauthMode;/);
+  assert.match(sidepanelSource, /rowSignupPhone\.style\.display =[\s\S]*&& !existingAccountReauthMode[\s\S]*\? ''[\s\S]*: 'none';/);
+  assert.match(sidepanelSource, /accountFlowMode:\s*selectedAccountFlowMode,/);
 });

@@ -96,6 +96,82 @@ test('step 8 submits login verification directly without replaying step 7', asyn
   assert.equal(calls.resolveOptions.completionStep, 8);
 });
 
+test('step 8 reauth uses the auto-detected mail provider for downstream polling state', async () => {
+  const calls = {
+    logs: [],
+    customCheckStates: [],
+    resolvedState: null,
+    setStates: [],
+  };
+
+  const executor = api.createStep8Executor({
+    addLog: async (message) => {
+      calls.logs.push(message);
+    },
+    chrome: {
+      tabs: {
+        update: async () => {},
+      },
+    },
+    CLOUDFLARE_TEMP_EMAIL_PROVIDER: 'cloudflare-temp-email',
+    confirmCustomVerificationStepBypass: async () => {
+      throw new Error('should not enter custom verification bypass');
+    },
+    ensureStep8VerificationPageReady: async () => ({ state: 'verification_page', displayedEmail: 'user@gmail.com' }),
+    getOAuthFlowRemainingMs: async () => 5000,
+    getOAuthFlowStepTimeoutMs: async (defaultTimeoutMs) => defaultTimeoutMs,
+    getMailConfig: () => ({
+      provider: 'gmail',
+      label: 'Gmail 邮箱',
+      source: 'gmail-mail',
+      url: 'https://mail.google.com/mail/u/0/#inbox',
+      inject: ['content/activation-utils.js', 'content/utils.js', 'content/gmail-mail.js'],
+      injectSource: 'gmail-mail',
+      autoDetected: true,
+      detectedEmail: 'user@gmail.com',
+      detectedEmailDomain: 'gmail.com',
+    }),
+    getState: async () => ({ email: 'user@gmail.com' }),
+    getTabId: async (sourceName) => (sourceName === 'openai-auth' ? 1 : null),
+    HOTMAIL_PROVIDER: 'hotmail-api',
+    isTabAlive: async () => true,
+    isVerificationMailPollingError: () => false,
+    LUCKMAIL_PROVIDER: 'luckmail-api',
+    resolveVerificationStep: async (_step, state) => {
+      calls.resolvedState = state;
+    },
+    reuseOrCreateTab: async () => {},
+    setState: async (payload) => {
+      calls.setStates.push(payload);
+    },
+    shouldUseCustomRegistrationEmail: (state) => {
+      calls.customCheckStates.push(state);
+      return false;
+    },
+    STANDARD_MAIL_VERIFICATION_RESEND_INTERVAL_MS: 25000,
+    STEP7_MAIL_POLLING_RECOVERY_MAX_ATTEMPTS: 8,
+    throwIfStopped: () => {},
+  });
+
+  await executor.executeStep8({
+    accountFlowMode: 'existing_account_reauth',
+    email: 'user@gmail.com',
+    mailProvider: 'custom',
+    emailGenerator: 'custom',
+    oauthUrl: 'https://oauth.example/latest',
+  });
+
+  assert.equal(calls.customCheckStates.length, 1);
+  assert.equal(calls.customCheckStates[0].mailProvider, 'gmail');
+  assert.equal(calls.customCheckStates[0].emailGenerator, '');
+  assert.equal(calls.resolvedState.mailProvider, 'gmail');
+  assert.equal(calls.resolvedState.emailGenerator, '');
+  assert.deepStrictEqual(calls.setStates, [
+    { step8VerificationTargetEmail: 'user@gmail.com' },
+  ]);
+  assert.ok(calls.logs.some((message) => message.includes('自动识别邮箱服务')));
+});
+
 test('step 8 rejects ordinary email verification page in phone login mode', async () => {
   const calls = {
     getMailConfigCalls: 0,
@@ -405,6 +481,59 @@ test('post-login phone verification skips on OAuth consent and errors when disab
     }),
     /手机接码未开启/
   );
+});
+
+test('post-login phone verification reports OAuth consent as reauth success in existing-account mode', async () => {
+  const logs = [];
+  const completions = [];
+  const executor = api.createStep8Executor({
+    addLog: async (message, level = 'info', options = {}) => {
+      logs.push({ message, level, step: options.step, stepKey: options.stepKey });
+    },
+    chrome: {
+      tabs: {
+        update: async () => {},
+      },
+    },
+    completeNodeFromBackground: async (step, payload) => {
+      completions.push({ step, payload });
+    },
+    getOAuthFlowStepTimeoutMs: async (defaultTimeoutMs) => defaultTimeoutMs,
+    getTabId: async () => 1,
+    phoneVerificationHelpers: {
+      completePhoneVerificationFlow: async () => {
+        throw new Error('OAuth consent should not call phone helper');
+      },
+    },
+    reuseOrCreateTab: async () => 1,
+    sendToContentScriptResilient: async () => ({ state: 'oauth_consent_page' }),
+    setState: async () => {},
+    throwIfStopped: () => {},
+  });
+
+  await executor.executePostLoginPhoneVerification({
+    visibleStep: 9,
+    nodeId: 'post-login-phone-verification',
+    phoneVerificationEnabled: true,
+    oauthUrl: 'https://oauth.example/latest',
+    accountFlowMode: 'existing_account_reauth',
+  });
+
+  assert.ok(logs.some((entry) => (
+    entry.message === '当前账号未进入补绑手机号链路，视为授权完成。'
+    && entry.level === 'ok'
+    && entry.step === 9
+    && entry.stepKey === 'post-login-phone-verification'
+  )));
+  assert.deepStrictEqual(completions, [
+    {
+      step: 'post-login-phone-verification',
+      payload: {
+        directOAuthConsentPage: true,
+        phoneVerification: false,
+      },
+    },
+  ]);
 });
 
 test('step 8 defers add-email page to the dedicated bind-email node in phone mode', async () => {
@@ -1813,6 +1942,79 @@ test('step 8 uses a fixed 10-minute lookback window and plans 2925 polling as 2/
   assert.equal(capturedOptions.targetEmail, '');
   assert.equal(capturedOptions.beforeSubmit, undefined);
   assert.equal(typeof capturedOptions.getRemainingTimeMs, 'function');
+});
+
+test('step 8 existing-account reauth prefers configured 2925 base mailbox over alias target for session checks', async () => {
+  let ensureOptions = null;
+
+  const executor = api.createStep8Executor({
+    addLog: async () => {},
+    chrome: {
+      tabs: {
+        update: async () => {},
+      },
+    },
+    CLOUDFLARE_TEMP_EMAIL_PROVIDER: 'cloudflare-temp-email',
+    confirmCustomVerificationStepBypass: async () => {},
+    ensureMail2925MailboxSession: async (options) => {
+      ensureOptions = options;
+    },
+    ensureStep8VerificationPageReady: async () => ({
+      state: 'verification_page',
+      displayedEmail: 'yixin911203sq96k6@2925.com',
+    }),
+    rerunStep7ForStep8Recovery: async () => {},
+    getOAuthFlowRemainingMs: async () => 8000,
+    getOAuthFlowStepTimeoutMs: async (defaultTimeoutMs) => Math.min(defaultTimeoutMs, 8000),
+    getMailConfig: () => ({
+      provider: '2925',
+      label: '2925 邮箱',
+      source: 'mail-2925',
+      url: 'https://2925.com',
+      navigateOnReuse: false,
+    }),
+    getState: async () => ({
+      accountFlowMode: 'existing_account_reauth',
+      email: 'yixin911203sq96k6@2925.com',
+      password: 'secret',
+      mail2925BaseEmail: 'yixin911203@2925.com',
+      mail2925UseAccountPool: false,
+      currentMail2925AccountId: '',
+      mail2925Accounts: [],
+    }),
+    getTabId: async (sourceName) => (sourceName === 'openai-auth' ? 1 : 2),
+    HOTMAIL_PROVIDER: 'hotmail-api',
+    isTabAlive: async () => true,
+    isVerificationMailPollingError: () => false,
+    LUCKMAIL_PROVIDER: 'luckmail-api',
+    resolveVerificationStep: async () => {},
+    reuseOrCreateTab: async () => {},
+    setState: async () => {},
+    setStepStatus: async () => {},
+    shouldUseCustomRegistrationEmail: () => false,
+    STANDARD_MAIL_VERIFICATION_RESEND_INTERVAL_MS: 25000,
+    STEP7_MAIL_POLLING_RECOVERY_MAX_ATTEMPTS: 8,
+    throwIfStopped: () => {},
+  });
+
+  await executor.executeStep8({
+    accountFlowMode: 'existing_account_reauth',
+    email: 'yixin911203sq96k6@2925.com',
+    password: 'secret',
+    oauthUrl: 'https://oauth.example/latest',
+    mail2925BaseEmail: 'yixin911203@2925.com',
+    mail2925UseAccountPool: false,
+    currentMail2925AccountId: '',
+    mail2925Accounts: [],
+  });
+
+  assert.deepStrictEqual(ensureOptions, {
+    accountId: null,
+    forceRelogin: false,
+    allowLoginWhenOnLoginPage: false,
+    expectedMailboxEmail: 'yixin911203@2925.com',
+    actionLabel: 'Step 8: ensure 2925 mailbox session',
+  });
 });
 
 test('step 8 falls back to the run email when the verification page does not expose a displayed email', async () => {

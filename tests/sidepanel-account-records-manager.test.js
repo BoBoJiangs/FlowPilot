@@ -161,6 +161,17 @@ test('sidepanel css keeps confirm modal above account records overlay', () => {
   assert.ok(overlayMatch, 'missing account records overlay z-index');
   assert.ok(modalMatch, 'missing modal overlay z-index');
   assert.ok(Number(modalMatch[1]) > Number(overlayMatch[1]));
+  assert.match(css, /\.account-record-item-badges\s*\{/);
+  assert.match(css, /\.account-record-item-badge\.is-plus\s*\{/);
+  assert.match(css, /\.account-record-item-badge\.is-free\s*\{/);
+  assert.match(css, /\.account-record-item-badge\.is-verified\s*\{/);
+  assert.match(css, /\.account-record-item-badge\.is-received\s*\{/);
+  assert.match(css, /\.account-record-item-badge\.is-unverified\s*\{/);
+  assert.match(css, /\.account-records-stat\.is-plus\s*\{/);
+  assert.match(css, /\.account-records-stat\.is-free\s*\{/);
+  assert.match(css, /\.account-records-stat\.is-verified\s*\{/);
+  assert.match(css, /\.account-records-stat\.is-received\s*\{/);
+  assert.match(css, /\.account-records-stat\.is-unverified\s*\{/);
 });
 
 test('sidepanel account records helper normalizes snapshot helper base url', () => {
@@ -299,6 +310,10 @@ test('account records manager supports filter chips and partial multi-select del
         recordId: 'success@example.com',
         email: 'success@example.com',
         password: 'secret',
+        plusModeEnabled: true,
+        phoneNumber: '66950001111',
+        phoneCodeReceived: true,
+        phoneVerificationSucceeded: true,
         finalStatus: 'success',
         finishedAt: '2026-04-17T04:31:00.000Z',
         retryCount: 0,
@@ -308,6 +323,9 @@ test('account records manager supports filter chips and partial multi-select del
         recordId: 'failed@example.com',
         email: 'failed@example.com',
         password: 'secret',
+        plusModeEnabled: false,
+        phoneNumber: '573503949196',
+        phoneCodeReceived: true,
         finalStatus: 'failed',
         finishedAt: '2026-04-17T04:29:00.000Z',
         retryCount: 2,
@@ -317,6 +335,8 @@ test('account records manager supports filter chips and partial multi-select del
         recordId: 'stopped@example.com',
         email: 'stopped@example.com',
         password: 'secret',
+        plusModeEnabled: false,
+        phoneNumber: '447799342687',
         finalStatus: 'stopped',
         finishedAt: '2026-04-17T04:28:00.000Z',
         retryCount: 1,
@@ -401,6 +421,16 @@ test('account records manager supports filter chips and partial multi-select del
 
   assert.match(meta.textContent, /共 3 条/);
   assert.match(stats.innerHTML, /data-account-record-filter="retry"/);
+  assert.match(stats.innerHTML, /data-account-record-filter="plus"/);
+  assert.match(stats.innerHTML, /data-account-record-filter="free"/);
+  assert.match(stats.innerHTML, /data-account-record-filter="verified"/);
+  assert.match(stats.innerHTML, /data-account-record-filter="received"/);
+  assert.match(stats.innerHTML, /data-account-record-filter="unverified"/);
+  assert.match(stats.innerHTML, /<strong>1<\/strong>Plus/);
+  assert.match(stats.innerHTML, /<strong>2<\/strong>Free/);
+  assert.match(stats.innerHTML, /<strong>1<\/strong>验证成功/);
+  assert.match(stats.innerHTML, /<strong>1<\/strong>已接码/);
+  assert.match(stats.innerHTML, /<strong>1<\/strong>未接码/);
   assert.match(list.innerHTML, /success@example\.com/);
   assert.match(list.innerHTML, /failed@example\.com/);
   assert.equal(pageLabel.textContent, '1 / 1');
@@ -452,6 +482,125 @@ test('account records manager supports filter chips and partial multi-select del
     message: '已删除 1 条账号记录。',
     tone: 'success',
   });
+});
+
+test('account records manager filters by Plus and phone-verification state', () => {
+  const source = fs.readFileSync('sidepanel/account-records-manager.js', 'utf8');
+  const windowObject = {};
+  const api = new Function('window', `${source}; return window.SidepanelAccountRecordsManager;`)(windowObject);
+
+  const list = createNode();
+  const stats = createNode();
+  const meta = createNode();
+  const manager = api.createAccountRecordsManager({
+    state: {
+      getLatestState: () => ({
+        accountRunHistory: [
+          {
+            recordId: 'plus-verified@example.com',
+            email: 'plus-verified@example.com',
+            plusModeEnabled: true,
+            phoneNumber: '66950001111',
+            phoneCodeReceived: true,
+            phoneVerificationSucceeded: true,
+            finalStatus: 'success',
+            finishedAt: '2026-04-17T04:31:00.000Z',
+            retryCount: 0,
+            failureLabel: '流程完成',
+          },
+          {
+            recordId: 'free-received@example.com',
+            email: 'free-received@example.com',
+            plusModeEnabled: false,
+            phoneNumber: '447799342687',
+            phoneCodeReceived: true,
+            finalStatus: 'failed',
+            finishedAt: '2026-04-17T04:30:00.000Z',
+            retryCount: 0,
+            failureLabel: '步骤 9 失败',
+          },
+          {
+            recordId: 'free-unverified@example.com',
+            email: 'free-unverified@example.com',
+            plusModeEnabled: false,
+            phoneNumber: '',
+            finalStatus: 'success',
+            finishedAt: '2026-04-17T04:29:00.000Z',
+            retryCount: 0,
+            failureLabel: '流程完成',
+          },
+        ],
+      }),
+      syncLatestState() {},
+    },
+    dom: {
+      accountRecordsList: list,
+      accountRecordsMeta: meta,
+      accountRecordsOverlay: createNode(),
+      accountRecordsPageLabel: createNode(),
+      accountRecordsStats: stats,
+      btnAccountRecordsNext: createNode(),
+      btnAccountRecordsPrev: createNode(),
+      btnClearAccountRecords: createNode(),
+      btnCloseAccountRecords: createNode(),
+      btnDeleteSelectedAccountRecords: createNode(),
+      btnOpenAccountRecords: createNode(),
+      btnToggleAccountRecordsSelection: createNode(),
+    },
+    helpers: {
+      escapeHtml: (value) => String(value || ''),
+    },
+    runtime: {
+      sendMessage: async () => ({}),
+    },
+    constants: {
+      displayTimeZone: 'Asia/Shanghai',
+      pageSize: 10,
+    },
+  });
+
+  manager.bindEvents();
+  manager.render();
+
+  stats.listeners.click({
+    target: createClosestTarget({
+      '[data-account-record-filter]': createDataNode('data-account-record-filter', 'plus'),
+    }),
+  });
+  assert.match(meta.textContent, /当前筛选 Plus 1 条/);
+  assert.match(list.innerHTML, /plus-verified@example\.com/);
+  assert.doesNotMatch(list.innerHTML, /free-received@example\.com/);
+  assert.doesNotMatch(list.innerHTML, /free-unverified@example\.com/);
+
+  stats.listeners.click({
+    target: createClosestTarget({
+      '[data-account-record-filter]': createDataNode('data-account-record-filter', 'verified'),
+    }),
+  });
+  assert.match(meta.textContent, /当前筛选 验证成功 1 条/);
+  assert.match(list.innerHTML, /plus-verified@example\.com/);
+  assert.doesNotMatch(list.innerHTML, /free-received@example\.com/);
+  assert.doesNotMatch(list.innerHTML, /free-unverified@example\.com/);
+
+  stats.listeners.click({
+    target: createClosestTarget({
+      '[data-account-record-filter]': createDataNode('data-account-record-filter', 'received'),
+    }),
+  });
+  assert.match(meta.textContent, /当前筛选 已接码未成功 1 条/);
+  assert.match(list.innerHTML, /free-received@example\.com/);
+  assert.doesNotMatch(list.innerHTML, /plus-verified@example\.com/);
+  assert.doesNotMatch(list.innerHTML, /free-unverified@example\.com/);
+
+  stats.listeners.click({
+    target: createClosestTarget({
+      '[data-account-record-filter]': createDataNode('data-account-record-filter', 'unverified'),
+    }),
+  });
+  assert.match(meta.textContent, /当前筛选 未接码 1 条/);
+  assert.match(list.innerHTML, /free-unverified@example\.com/);
+  assert.doesNotMatch(list.innerHTML, /plus-verified@example\.com/);
+  assert.doesNotMatch(list.innerHTML, /free-verified@example\.com/);
 });
 
 test('account records manager displays phone-only records with account identifier fallback', () => {
@@ -529,7 +678,10 @@ test('account records manager displays combined email and phone identities in on
             accountIdentifierType: 'phone',
             accountIdentifier: '+447700900123',
             phoneNumber: '+447700900123',
+            phoneCodeReceived: true,
+            phoneVerificationSucceeded: true,
             email: 'bound@example.com',
+            plusModeEnabled: true,
             finalStatus: 'success',
             finishedAt: '2026-04-17T04:31:00.000Z',
             retryCount: 0,
@@ -540,7 +692,9 @@ test('account records manager displays combined email and phone identities in on
             accountIdentifierType: 'email',
             accountIdentifier: 'mail@example.com',
             phoneNumber: '447799342687',
+            phoneCodeReceived: true,
             email: 'mail@example.com',
+            plusModeEnabled: false,
             finalStatus: 'failed',
             finishedAt: '2026-04-17T04:30:00.000Z',
             retryCount: 0,
@@ -581,9 +735,130 @@ test('account records manager displays combined email and phone identities in on
   assert.match(list.innerHTML, /\+447700900123/);
   assert.match(list.innerHTML, /邮箱 bound@example\.com/);
   assert.match(list.innerHTML, /mail@example\.com/);
-  assert.match(list.innerHTML, /绑定手机号 447799342687/);
+  assert.match(list.innerHTML, /接码手机号 447799342687/);
+  assert.match(list.innerHTML, /account-record-item-badge is-plus">Plus/);
+  assert.match(list.innerHTML, /account-record-item-badge is-free">Free/);
+  assert.match(list.innerHTML, /account-record-item-badge is-verified">验证成功/);
+  assert.match(list.innerHTML, /account-record-item-badge is-received">已接码未成功/);
   assert.match(
     list.innerHTML,
     /title="\+447700900123 \/ 邮箱 bound@example\.com"/
   );
+});
+
+test('account records manager keeps assigned phone hidden until a code was actually received', () => {
+  const source = fs.readFileSync('sidepanel/account-records-manager.js', 'utf8');
+  const windowObject = {};
+  const api = new Function('window', `${source}; return window.SidepanelAccountRecordsManager;`)(windowObject);
+
+  const list = createNode();
+  const manager = api.createAccountRecordsManager({
+    state: {
+      getLatestState: () => ({
+        accountRunHistory: [
+          {
+            recordId: 'pending-phone@example.com',
+            accountIdentifierType: 'email',
+            accountIdentifier: 'pending-phone@example.com',
+            email: 'pending-phone@example.com',
+            phoneNumber: '573503949196',
+            plusModeEnabled: false,
+            finalStatus: 'stopped',
+            finishedAt: '2026-04-17T04:30:00.000Z',
+            retryCount: 0,
+            failureLabel: '步骤 9 停止',
+          },
+        ],
+      }),
+      syncLatestState() {},
+    },
+    dom: {
+      accountRecordsList: list,
+      accountRecordsMeta: createNode(),
+      accountRecordsOverlay: createNode(),
+      accountRecordsPageLabel: createNode(),
+      accountRecordsStats: createNode(),
+      btnAccountRecordsNext: createNode(),
+      btnAccountRecordsPrev: createNode(),
+      btnClearAccountRecords: createNode(),
+      btnCloseAccountRecords: createNode(),
+      btnDeleteSelectedAccountRecords: createNode(),
+      btnOpenAccountRecords: createNode(),
+      btnToggleAccountRecordsSelection: createNode(),
+    },
+    helpers: {
+      escapeHtml: (value) => String(value || ''),
+    },
+    runtime: {
+      sendMessage: async () => ({}),
+    },
+    constants: {
+      displayTimeZone: 'Asia/Shanghai',
+      pageSize: 10,
+    },
+  });
+
+  manager.render();
+
+  assert.match(list.innerHTML, /account-record-item-badge is-unverified">未接码/);
+  assert.doesNotMatch(list.innerHTML, /接码手机号 573503949196/);
+});
+
+test('account records manager marks records without phone flow as Free and 未接码', () => {
+  const source = fs.readFileSync('sidepanel/account-records-manager.js', 'utf8');
+  const windowObject = {};
+  const api = new Function('window', `${source}; return window.SidepanelAccountRecordsManager;`)(windowObject);
+
+  const list = createNode();
+  const manager = api.createAccountRecordsManager({
+    state: {
+      getLatestState: () => ({
+        accountRunHistory: [
+          {
+            recordId: 'free-no-phone@example.com',
+            accountIdentifierType: 'email',
+            accountIdentifier: 'free-no-phone@example.com',
+            email: 'free-no-phone@example.com',
+            phoneNumber: '',
+            plusModeEnabled: false,
+            finalStatus: 'success',
+            finishedAt: '2026-04-17T04:31:00.000Z',
+            retryCount: 0,
+            failureLabel: '流程完成',
+          },
+        ],
+      }),
+      syncLatestState() {},
+    },
+    dom: {
+      accountRecordsList: list,
+      accountRecordsMeta: createNode(),
+      accountRecordsOverlay: createNode(),
+      accountRecordsPageLabel: createNode(),
+      accountRecordsStats: createNode(),
+      btnAccountRecordsNext: createNode(),
+      btnAccountRecordsPrev: createNode(),
+      btnClearAccountRecords: createNode(),
+      btnCloseAccountRecords: createNode(),
+      btnDeleteSelectedAccountRecords: createNode(),
+      btnOpenAccountRecords: createNode(),
+      btnToggleAccountRecordsSelection: createNode(),
+    },
+    helpers: {
+      escapeHtml: (value) => String(value || ''),
+    },
+    runtime: {
+      sendMessage: async () => ({}),
+    },
+    constants: {
+      displayTimeZone: 'Asia/Shanghai',
+      pageSize: 10,
+    },
+  });
+
+  manager.render();
+
+  assert.match(list.innerHTML, /account-record-item-badge is-free">Free/);
+  assert.match(list.innerHTML, /account-record-item-badge is-unverified">未接码/);
+  assert.doesNotMatch(list.innerHTML, /接码手机号/);
 });

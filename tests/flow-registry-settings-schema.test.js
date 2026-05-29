@@ -99,6 +99,7 @@ test('settings schema normalizes view input into canonical nested namespaces', (
   const normalized = schema.normalizeSettingsState({
     activeFlowId: 'kiro',
     targetId: 'kiro-rs',
+    accountFlowMode: 'existing_account_reauth',
     mailProvider: 'hotmail',
     ipProxyEnabled: true,
     ipProxyService: '711proxy',
@@ -117,6 +118,7 @@ test('settings schema normalizes view input into canonical nested namespaces', (
   assert.equal(normalized.services.email.provider, 'hotmail');
   assert.equal(normalized.services.proxy.enabled, true);
   assert.equal(normalized.services.account.customPassword, 'SharedSecret123!');
+  assert.equal(normalized.flows.openai.signup.accountFlowMode, 'existing_account_reauth');
   assert.equal(normalized.flows.openai.selectedTargetId, 'cpa');
   assert.equal(normalized.flows.openai.plus.plusAccountAccessStrategy, 'sub2api_codex_session');
   assert.equal(normalized.flows.kiro.selectedTargetId, 'kiro-rs');
@@ -165,6 +167,7 @@ test('settings schema can project canonical state into a read view without legac
   const normalized = schema.normalizeSettingsState({
     activeFlowId: 'kiro',
     targetId: 'kiro-rs',
+    accountFlowMode: 'existing_account_reauth',
     kiroRsUrl: 'https://kiro.example.com/admin',
     kiroRsKey: 'key-123',
     plusAccountAccessStrategy: 'sub2api_codex_session',
@@ -173,6 +176,7 @@ test('settings schema can project canonical state into a read view without legac
 
   assert.equal(view.activeFlowId, 'kiro');
   assert.equal(view.targetId, 'kiro-rs');
+  assert.equal(view.accountFlowMode, 'existing_account_reauth');
   assert.equal(view.kiroRsUrl, 'https://kiro.example.com/admin');
   assert.equal(view.kiroRsKey, 'key-123');
   assert.equal(view.plusAccountAccessStrategy, 'sub2api_codex_session');
